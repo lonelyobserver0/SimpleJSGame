@@ -1,44 +1,240 @@
-<!DOCTYPE html>
-<html lang="it">
+// Add weapon glow effect
+    const glowGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+    const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.2
+    });
+    this.glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    this.glow.position.set(0, 0, 0);
+    this.mesh.add(this.glow);<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Multiplayer FPS</title>
-<link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer FPS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: white;
+            overflow: hidden;
+            cursor: none;
+        }
+
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+
+        #hud > div {
+            margin-bottom: 8px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            border-left: 3px solid #00ff00;
+        }
+
+        #weapon-info {
+            margin-top: 10px;
+        }
+
+        #health-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin: 10px 0;
+        }
+
+        #health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+            transition: width 0.3s ease;
+            border-radius: 8px;
+        }
+
+        #kill-feed {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 300px;
+            pointer-events: none;
+        }
+
+        #kill-feed div {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 6px 12px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 12px;
+            border-left: 3px solid #ff4444;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        .crosshair-line {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .crosshair-h {
+            width: 20px;
+            height: 2px;
+            top: -1px;
+            left: -10px;
+        }
+
+        .crosshair-v {
+            width: 2px;
+            height: 20px;
+            top: -10px;
+            left: -1px;
+        }
+
+        #instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        #instructions h3 {
+            color: #00ff00;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        #instructions p {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        #btnConnect {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: background 0.3s;
+            pointer-events: auto;
+        }
+
+        #btnConnect:hover {
+            background: #00cc00;
+        }
+
+        #btnConnect:active {
+            background: #008800;
+        }
+
+        canvas {
+            display: block;
+            background: #111;
+        }
+
+        .damage-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 30%, rgba(255, 0, 0, 0.3) 100%);
+            z-index: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .ammo-counter {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffff00;
+        }
+
+        .weapon-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00ffff;
+        }
+    </style>
 </head>
 <body>
 
 <div id="hud">
-  <div>Stato: <span id="status">disconnected</span></div>
-  <div>Ping: <span id="ping">0</span> ms</div>
-  <div id="weapon-info">
-    <div id="hud_weapon">Arma: NESSUNA</div>
-    <div id="hud_ammo">Munizioni: 0</div>
-  </div>
-  <div id="health-bar">
-    <div id="health-fill" style="width: 100%"></div>
-  </div>
-  <div>Vita: <span id="health-text">100</span>/100</div>
-  <div id="kill-feed"></div>
-  <button id="btnConnect">Connetti</button>
+    <div>Status: <span id="status">Disconnected</span></div>
+    <div>Ping: <span id="ping">0</span> ms</div>
+    <div id="weapon-info">
+        <div class="weapon-name" id="hud_weapon">Weapon: NONE</div>
+        <div class="ammo-counter" id="hud_ammo">Ammo: 0</div>
+    </div>
+    <div id="health-bar">
+        <div id="health-fill" style="width: 100%"></div>
+    </div>
+    <div>Health: <span id="health-text">100</span>/100</div>
+    <button id="btnConnect">Connect to Server</button>
 </div>
 
 <div id="crosshair">
-  <div class="crosshair-line crosshair-h"></div>
-  <div class="crosshair-line crosshair-v"></div>
+    <div class="crosshair-line crosshair-h"></div>
+    <div class="crosshair-line crosshair-v"></div>
 </div>
 
+<div id="kill-feed"></div>
+
 <div id="instructions">
-  <h3>Multiplayer FPS</h3>
-  <p>Clicca per iniziare</p>
-  <p><strong>Controlli:</strong></p>
-  <p>WASD - Movimento</p>
-  <p>Mouse - Guarda intorno</p>
-  <p>Click sinistro - Spara</p>
-  <p>E - Raccogli arma</p>
-  <p>Shift - Corri</p>
-  <p>Ctrl - Accucciati</p>
+    <h3>🎯 Multiplayer FPS</h3>
+    <p><strong>Click anywhere to start playing</strong></p>
+    <br>
+    <p><strong>Controls:</strong></p>
+    <p><strong>S</strong> - Muoviti avanti</p>
+    <p><strong>W</strong> - Muoviti indietro</p>
+    <p><strong>A/D</strong> - Muoviti lateralmente</p>
+    <p><strong>Mouse</strong> - Guarda intorno</p>
+    <p><strong>Click Sinistro</strong> - Spara</p>
+    <p><strong>E</strong> - Raccogli armi</p>
+    <p><strong>Shift</strong> - Corri</p>
+    <p><strong>Ctrl</strong> - Accucciati</p>
+    <br>
+    <p>🔫 Le armi appaiono casualmente sulla mappa!</p>
+    <p>Connettiti al server e inizia a combattere!</p>
 </div>
+
+<div class="damage-overlay" id="damageOverlay"></div>
 
 <!-- Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -52,549 +248,1147 @@ let myId = null;
 let scene, camera, renderer;
 let players = {};
 let weapons = {};
-let targets = {};
 let tracers = [];
 let isLocked = false;
 let lastInputSent = 0;
 let lastFrame = performance.now();
+let lastPingTime = 0;
 
 const sensitivity = 0.002;
+const serverURL = "ws://localhost:8765"; // Change this to your server address
 
 // Local player state
 const localPlayer = {
-  x: 0, y: 1.0, z: 0, 
-  yaw: 0, pitch: 0,
-  keys: {},
-  serverKeys: {},
-  velocity: {x:0, z:0},
-  weapon: null,
-  ammo: 0,
-  health: 100,
-  
-  update(dt) {
-    // Movement calculation
-    let dx = 0, dz = 0;
-    const yaw = this.yaw;
-    const forward = {x: Math.sin(yaw), z: Math.cos(yaw)};
-    const right = {x: Math.sin(yaw + Math.PI/2), z: Math.cos(yaw + Math.PI/2)};
+    x: 0, y: 1.0, z: 0, 
+    yaw: 0, pitch: 0,
+    keys: {},
+    serverKeys: {},
+    velocity: {x: 0, z: 0},
+    weapon: null,
+    ammo: 0,
+    health: 100,
+    bodyMesh: null,
+    armsMesh: null,
+    weaponMesh: null,
     
-    if(this.keys.forward) { dx += forward.x; dz += forward.z; }
-    if(this.keys.backward){ dx -= forward.x; dz -= forward.z; }
-    if(this.keys.left){ dx -= right.x; dz -= right.z; }
-    if(this.keys.right){ dx += right.x; dz += right.z; }
-
-    let baseSpeed = 5.0;
-    if(this.keys.run) baseSpeed *= 1.8;
-    if(this.keys.crouch) baseSpeed *= 0.5;
-
-    const L = Math.hypot(dx, dz);
-    if(L > 0){ dx = dx/L * baseSpeed; dz = dz/L * baseSpeed; }
-
-    const accel = 15.0, decel = 12.0;
-    this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, dx, dt * (L > 0 ? accel : decel));
-    this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, dz, dt * (L > 0 ? accel : decel));
+    createBody() {
+        // Create first-person body (arms and weapon that we can see)
+        const armGroup = new THREE.Group();
+        
+        // Left arm
+        const leftArmGeometry = new THREE.CapsuleGeometry(0.08, 0.6, 4, 8);
+        const armMaterial = new THREE.MeshLambertMaterial({ color: 0xffdbac });
+        this.leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
+        this.leftArm.position.set(-0.3, -0.2, -0.5);
+        this.leftArm.rotation.x = 0.3;
+        armGroup.add(this.leftArm);
+        
+        // Right arm
+        this.rightArm = new THREE.Mesh(leftArmGeometry, armMaterial);
+        this.rightArm.position.set(0.3, -0.2, -0.4);
+        this.rightArm.rotation.x = 0.2;
+        armGroup.add(this.rightArm);
+        
+        // Hands
+        const handGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+        this.leftHand = new THREE.Mesh(handGeometry, armMaterial);
+        this.leftHand.position.set(-0.35, -0.5, -0.8);
+        armGroup.add(this.leftHand);
+        
+        this.rightHand = new THREE.Mesh(handGeometry, armMaterial);
+        this.rightHand.position.set(0.35, -0.5, -0.7);
+        armGroup.add(this.rightHand);
+        
+        this.armsMesh = armGroup;
+        camera.add(this.armsMesh);
+    },
     
-    this.x += this.velocity.x * dt; 
-    this.z += this.velocity.z * dt;
-    this.y = THREE.MathUtils.lerp(this.y, this.keys.crouch ? 0.7 : 1.0, dt * 8);
-
-    // Update camera
-    camera.position.set(this.x, this.y + 0.6, this.z);
-    camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    
-    // Convert keys for server
-    this.serverKeys = {
-      w: this.keys.forward || false,
-      s: this.keys.backward || false, 
-      a: this.keys.left || false,
-      d: this.keys.right || false,
-      shift: this.keys.run || false,
-      ctrl: this.keys.crouch || false
-    };
-    
-    // Send input to server
-    const now = performance.now();
-    if(ws && ws.readyState === WebSocket.OPEN && now - lastInputSent > 50) {
-      ws.send(JSON.stringify({
-        type: "input",
-        input: {
-          yaw: this.yaw,
-          pitch: this.pitch,
-          keys: this.serverKeys
+    updateWeaponModel() {
+        // Remove old weapon model
+        if(this.weaponMesh) {
+            camera.remove(this.weaponMesh);
+            this.weaponMesh = null;
         }
-      }));
-      lastInputSent = now;
+        
+        if(!this.weapon) return;
+        
+        // Create weapon model based on type
+        let weaponGeometry, weaponMaterial;
+        
+        switch(this.weapon) {
+            case 'pistol':
+                weaponGeometry = new THREE.BoxGeometry(0.08, 0.15, 0.25);
+                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+                break;
+            case 'rifle':
+                weaponGeometry = new THREE.BoxGeometry(0.06, 0.12, 0.8);
+                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+                break;
+            case 'shotgun':
+                weaponGeometry = new THREE.BoxGeometry(0.08, 0.15, 0.6);
+                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+                break;
+            default:
+                return;
+        }
+        
+        this.weaponMesh = new THREE.Mesh(weaponGeometry, weaponMaterial);
+        this.weaponMesh.position.set(0.2, -0.3, -0.5);
+        this.weaponMesh.rotation.y = -0.1;
+        camera.add(this.weaponMesh);
+    },
+    
+    animateArms(dt, isMoving, isRunning, isCrouching) {
+        if(!this.armsMesh) return;
+        
+        const time = performance.now() * 0.001;
+        
+        // Base positions
+        let leftArmY = -0.2;
+        let rightArmY = -0.2;
+        let leftArmZ = -0.5;
+        let rightArmZ = -0.4;
+        
+        // Walking animation
+        if(isMoving) {
+            const walkSpeed = isRunning ? 8 : 4;
+            const walkAmount = isRunning ? 0.1 : 0.05;
+            
+            leftArmY += Math.sin(time * walkSpeed) * walkAmount;
+            rightArmY += Math.sin(time * walkSpeed + Math.PI) * walkAmount;
+            leftArmZ += Math.cos(time * walkSpeed) * walkAmount * 0.5;
+            rightArmZ += Math.cos(time * walkSpeed + Math.PI) * walkAmount * 0.5;
+        }
+        
+        // Breathing animation when idle
+        if(!isMoving) {
+            const breathAmount = 0.02;
+            leftArmY += Math.sin(time * 2) * breathAmount;
+            rightArmY += Math.sin(time * 2 + 0.5) * breathAmount;
+        }
+        
+        // Crouching adjustment
+        if(isCrouching) {
+            leftArmY += 0.1;
+            rightArmY += 0.1;
+            leftArmZ -= 0.1;
+            rightArmZ -= 0.1;
+        }
+        
+        // Apply positions smoothly
+        this.leftArm.position.y = THREE.MathUtils.lerp(this.leftArm.position.y, leftArmY, dt * 8);
+        this.rightArm.position.y = THREE.MathUtils.lerp(this.rightArm.position.y, rightArmY, dt * 8);
+        this.leftArm.position.z = THREE.MathUtils.lerp(this.leftArm.position.z, leftArmZ, dt * 8);
+        this.rightArm.position.z = THREE.MathUtils.lerp(this.rightArm.position.z, rightArmZ, dt * 8);
+        
+        // Update hands to follow arms
+        this.leftHand.position.y = this.leftArm.position.y - 0.3;
+        this.leftHand.position.z = this.leftArm.position.z - 0.3;
+        this.rightHand.position.y = this.rightArm.position.y - 0.3;
+        this.rightHand.position.z = this.rightArm.position.z - 0.3;
+        
+        // Weapon bob
+        if(this.weaponMesh) {
+            let weaponY = -0.3;
+            let weaponZ = -0.5;
+            
+            if(isMoving) {
+                const bobAmount = isRunning ? 0.08 : 0.04;
+                weaponY += Math.sin(time * (isRunning ? 8 : 4)) * bobAmount;
+                weaponZ += Math.cos(time * (isRunning ? 8 : 4)) * bobAmount * 0.5;
+            }
+            
+            if(isCrouching) {
+                weaponY += 0.05;
+                weaponZ -= 0.1;
+            }
+            
+            this.weaponMesh.position.y = THREE.MathUtils.lerp(this.weaponMesh.position.y, weaponY, dt * 10);
+            this.weaponMesh.position.z = THREE.MathUtils.lerp(this.weaponMesh.position.z, weaponZ, dt * 10);
+        }
+    },
+    
+    animateRecoil() {
+        if(!this.weaponMesh || !this.armsMesh) return;
+        
+        // Weapon recoil
+        this.weaponMesh.rotation.x = -0.2;
+        this.weaponMesh.position.z += 0.1;
+        
+        // Arms recoil
+        this.leftArm.rotation.x += 0.1;
+        this.rightArm.rotation.x += 0.1;
+        
+        // Smooth return to normal
+        const resetRecoil = () => {
+            if(this.weaponMesh) {
+                this.weaponMesh.rotation.x = THREE.MathUtils.lerp(this.weaponMesh.rotation.x, 0, 0.1);
+                this.weaponMesh.position.z = THREE.MathUtils.lerp(this.weaponMesh.position.z, -0.5, 0.1);
+            }
+            
+            if(this.leftArm && this.rightArm) {
+                this.leftArm.rotation.x = THREE.MathUtils.lerp(this.leftArm.rotation.x, 0.3, 0.1);
+                this.rightArm.rotation.x = THREE.MathUtils.lerp(this.rightArm.rotation.x, 0.2, 0.1);
+            }
+            
+            if(Math.abs(this.weaponMesh?.rotation.x || 0) > 0.01) {
+                requestAnimationFrame(resetRecoil);
+            }
+        };
+        
+        requestAnimationFrame(resetRecoil);
+    },
+    
+    update(dt) {
+        // Movement calculation
+        let dx = 0, dz = 0;
+        const yaw = this.yaw;
+        const forward = {x: Math.sin(yaw), z: Math.cos(yaw)};
+        const right = {x: Math.sin(yaw + Math.PI/2), z: Math.cos(yaw + Math.PI/2)};
+        
+        if(this.keys.forward) { dx -= forward.x; dz -= forward.z; }
+        if(this.keys.backward){ dx += forward.x; dz += forward.z; }
+        if(this.keys.left){ dx -= right.x; dz -= right.z; }
+        if(this.keys.right){ dx += right.x; dz += right.z; }
+
+        let baseSpeed = 5.0;
+        const isRunning = this.keys.run;
+        const isCrouching = this.keys.crouch;
+        
+        if(isRunning) baseSpeed *= 1.8;
+        if(isCrouching) baseSpeed *= 0.5;
+
+        const L = Math.hypot(dx, dz);
+        const isMoving = L > 0;
+        if(isMoving){ dx = dx/L * baseSpeed; dz = dz/L * baseSpeed; }
+
+        const accel = 15.0, decel = 12.0;
+        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, dx, dt * (isMoving ? accel : decel));
+        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, dz, dt * (isMoving ? accel : decel));
+        
+        this.x += this.velocity.x * dt; 
+        this.z += this.velocity.z * dt;
+        this.y = THREE.MathUtils.lerp(this.y, isCrouching ? 0.7 : 1.0, dt * 8);
+
+        // Update camera
+        camera.position.set(this.x, this.y + 0.6, this.z);
+        camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+        
+        // Animate first-person body
+        this.animateArms(dt, isMoving, isRunning, isCrouching);
+        
+        // Convert keys for server
+        this.serverKeys = {
+            w: this.keys.forward || false,
+            s: this.keys.backward || false, 
+            a: this.keys.left || false,
+            d: this.keys.right || false,
+            shift: this.keys.run || false,
+            ctrl: this.keys.crouch || false
+        };
+        
+        // Send input to server
+        const now = performance.now();
+        if(ws && ws.readyState === WebSocket.OPEN && now - lastInputSent > 50) {
+            ws.send(JSON.stringify({
+                type: "input",
+                input: {
+                    yaw: this.yaw,
+                    pitch: this.pitch,
+                    keys: this.serverKeys
+                }
+            }));
+            lastInputSent = now;
+        }
+    },
+    
+    takeDamage() {
+        // Visual damage effect
+        const overlay = document.getElementById('damageOverlay');
+        overlay.style.opacity = '1';
+        setTimeout(() => {
+            overlay.style.opacity = '0';
+        }, 300);
     }
-  },
-  
-  takeDamage() {
-    // Visual damage effect
-    document.body.style.boxShadow = 'inset 0 0 50px rgba(255,0,0,0.5)';
-    setTimeout(() => {
-      document.body.style.boxShadow = 'none';
-    }, 200);
-  }
 };
 
 // ============= PLAYER CLASS =============
 class Player {
-  constructor(id, x=0, y=1, z=0) {
-    this.id = id;
-    this.x = x; this.y = y; this.z = z;
-    this.yaw = 0; this.pitch = 0;
-    this.health = 100;
-    this.weapon = null;
-    this.ammo = 0;
+    constructor(id, x=0, y=1, z=0) {
+        this.id = id;
+        this.x = x; this.y = y; this.z = z;
+        this.yaw = 0; this.pitch = 0;
+        this.health = 100;
+        this.weapon = null;
+        this.ammo = 0;
+        this.lastUpdate = performance.now();
 
-    // Create mesh
-    const geometry = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
-    const material = new THREE.MeshStandardMaterial({ 
-      color: id === myId ? 0x0000ff : 0x00ff00 
-    });
-    this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.castShadow = true;
-    this.mesh.position.set(this.x, this.y, this.z);
-    scene.add(this.mesh);
-    
-    players[id] = this;
-    console.log(`👤 Player ${id} created`);
-  }
+        // Create mesh - different colors for different players
+        const geometry = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
+        const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff];
+        const colorIndex = parseInt(id.slice(-1), 16) % colors.length;
+        const material = new THREE.MeshLambertMaterial({ 
+            color: id === myId ? 0x0088ff : colors[colorIndex]
+        });
+        
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
+        this.mesh.position.set(this.x, this.y, this.z);
+        
+        // Add name tag
+        this.createNameTag();
+        
+        scene.add(this.mesh);
+        players[id] = this;
+        console.log(`👤 Player ${id} created`);
+    }
 
-  update(dt) {
-    this.mesh.position.set(this.x, this.y, this.z);
-    this.mesh.rotation.y = this.yaw;
-  }
+    createNameTag() {
+        // Simple name representation with a small sphere above player
+        const nameGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+        const nameMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        this.nameTag = new THREE.Mesh(nameGeometry, nameMaterial);
+        this.nameTag.position.set(0, 1.8, 0);
+        this.mesh.add(this.nameTag);
+    }
 
-  remove() {
-    scene.remove(this.mesh);
-    delete players[this.id];
-    console.log(`👤 Player ${this.id} removed`);
-  }
+    update(dt) {
+        // Smooth interpolation for other players
+        if(this.id !== myId) {
+            this.mesh.position.lerp(new THREE.Vector3(this.x, this.y, this.z), dt * 10);
+            this.mesh.rotation.y = THREE.MathUtils.lerpAngle(this.mesh.rotation.y, this.yaw, dt * 8);
+        } else {
+            this.mesh.position.set(this.x, this.y, this.z);
+            this.mesh.rotation.y = this.yaw;
+        }
+    }
+
+    remove() {
+        scene.remove(this.mesh);
+        delete players[this.id];
+        console.log(`👤 Player ${this.id} removed`);
+    }
 }
 
 // ============= WEAPON CLASS =============
 class Weapon {
-  constructor(id, type, x, y, z, ammo=30) {
-    this.id = id; 
-    this.type = type; 
-    this.x = x; this.y = y; this.z = z; 
-    this.ammo = ammo;
+    constructor(id, type, x, y, z) {
+        this.id = id; 
+        this.type = type; 
+        this.x = x; this.y = y; this.z = z;
 
-    const geometry = new THREE.BoxGeometry(0.3, 0.2, 0.7);
-    const material = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
-    this.mesh = new THREE.Mesh(geometry, material);
-    this.mesh.position.set(x, y, z);
-    this.mesh.castShadow = true;
-    
-    this.rotationSpeed = Math.random() * 0.02 + 0.01;
-    this.baseY = y;
-    
-    scene.add(this.mesh);
-    weapons[id] = this;
-    console.log(`🔫 Weapon ${type} spawned at (${x}, ${y}, ${z})`);
-  }
+        // Different weapon shapes
+        let geometry;
+        let color;
+        
+        switch(type) {
+            case 'pistol':
+                geometry = new THREE.BoxGeometry(0.15, 0.1, 0.4);
+                color = 0xffaa00;
+                break;
+            case 'rifle':
+                geometry = new THREE.BoxGeometry(0.1, 0.15, 0.8);
+                color = 0x888888;
+                break;
+            case 'shotgun':
+                geometry = new THREE.BoxGeometry(0.12, 0.2, 0.7);
+                color = 0x654321;
+                break;
+            default:
+                geometry = new THREE.BoxGeometry(0.2, 0.15, 0.6);
+                color = 0xffaa00;
+        }
 
-  update(dt) {
-    this.mesh.rotation.y += this.rotationSpeed;
-    this.mesh.position.y = this.baseY + Math.sin(Date.now() * 0.003) * 0.1;
-  }
+        const material = new THREE.MeshLambertMaterial({ color: color });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.set(x, y, z);
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
+        
+        this.rotationSpeed = Math.random() * 0.02 + 0.01;
+        this.baseY = y;
+        
+        scene.add(this.mesh);
+        weapons[id] = this;
+        console.log(`🔫 Weapon ${type} spawned at (${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)})`);
+    }
 
-  remove() {
-    scene.remove(this.mesh);
-    delete weapons[this.id];
-    console.log(`🔫 Weapon ${this.id} removed`);
-  }
+    update(dt) {
+        this.mesh.rotation.y += this.rotationSpeed;
+        this.mesh.position.y = this.baseY + Math.sin(Date.now() * 0.003) * 0.1;
+        
+        // Animate glow
+        if(this.glow) {
+            this.glow.rotation.x += dt * 2;
+            this.glow.rotation.z += dt * 1.5;
+            this.glow.material.opacity = 0.1 + Math.sin(Date.now() * 0.005) * 0.1;
+        }
+    }
+
+    remove() {
+        scene.remove(this.mesh);
+        delete weapons[this.id];
+        console.log(`🔫 Weapon ${this.id} removed`);
+    }
 }
 
 // ============= PROJECTILE SYSTEM =============
 function spawnTracer(x, y, z, dir) {
-  const geometry = new THREE.CylinderGeometry(0.02, 0.02, 0.5, 6);
-  const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-  const tracer = new THREE.Mesh(geometry, material);
-  tracer.position.set(x + dir.x * 0.5, y + 0.2, z + dir.z * 0.5);
-  tracer.rotation.x = Math.PI / 2;
-  scene.add(tracer);
-  tracers.push({mesh: tracer, dir: dir, life: 0.3});
+    const geometry = new THREE.CylinderGeometry(0.02, 0.02, 0.5, 6);
+    const material = new THREE.MeshBasicMaterial({ color: 0xffff44, transparent: true });
+    const tracer = new THREE.Mesh(geometry, material);
+    
+    tracer.position.set(x + dir.x * 0.5, y + 0.2, z + dir.z * 0.5);
+    tracer.rotation.z = Math.atan2(dir.x, dir.y);
+    tracer.rotation.x = Math.atan2(Math.sqrt(dir.x*dir.x + dir.z*dir.z), -dir.y);
+    
+    scene.add(tracer);
+    tracers.push({mesh: tracer, dir: dir, life: 0.5, speed: 50});
 }
 
 function createMuzzleFlash() {
-  const geometry = new THREE.SphereGeometry(0.1, 6, 6);
-  const material = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
-  const flash = new THREE.Mesh(geometry, material);
-  flash.position.copy(camera.position);
-  flash.position.add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(0.5));
-  scene.add(flash);
-  setTimeout(() => scene.remove(flash), 50);
+    const geometry = new THREE.SphereGeometry(0.15, 8, 8);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0xffaa00,
+        transparent: true,
+        opacity: 0.8
+    });
+    const flash = new THREE.Mesh(geometry, material);
+    
+    // Position in front of camera
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    flash.position.copy(camera.position);
+    flash.position.add(dir.multiplyScalar(0.8));
+    
+    scene.add(flash);
+    
+    // Animate and remove
+    let opacity = 0.8;
+    const fadeInterval = setInterval(() => {
+        opacity -= 0.1;
+        flash.material.opacity = opacity;
+        if(opacity <= 0) {
+            scene.remove(flash);
+            clearInterval(fadeInterval);
+        }
+    }, 20);
 }
 
 function updateProjectiles(dt) {
-  for(let i = tracers.length - 1; i >= 0; i--) {
-    const t = tracers[i];
-    t.mesh.position.x += t.dir.x * dt * 50;
-    t.mesh.position.y += t.dir.y * dt * 50;
-    t.mesh.position.z += t.dir.z * dt * 50;
-    t.life -= dt;
-    
-    if(t.life <= 0) {
-      scene.remove(t.mesh);
-      tracers.splice(i, 1);
+    for(let i = tracers.length - 1; i >= 0; i--) {
+        const t = tracers[i];
+        t.mesh.position.x += t.dir.x * dt * t.speed;
+        t.mesh.position.y += t.dir.y * dt * t.speed;
+        t.mesh.position.z += t.dir.z * dt * t.speed;
+        t.life -= dt;
+        
+        // Fade out over time
+        t.mesh.material.opacity = t.life / 0.5;
+        
+        if(t.life <= 0) {
+            scene.remove(t.mesh);
+            tracers.splice(i, 1);
+        }
     }
-  }
 }
 
 // ============= SCENE INITIALIZATION =============
 function initScene() {
-  console.log("🎮 Initializing 3D scene...");
-  
-  scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x333333, 50, 200);
+    console.log("🎮 Initializing 3D scene...");
+    
+    scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x222222, 50, 200);
 
-  camera = new THREE.PerspectiveCamera(90, innerWidth/innerHeight, 0.1, 1000);
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
+    camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearColor(0x222222);
+    document.body.appendChild(renderer.domElement);
 
-  window.addEventListener('resize', () => {
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  });
+    // Resize handler
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
-  // Lights
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-  dirLight.position.set(10, 20, 10);
-  dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
-  scene.add(dirLight);
+    // Lighting
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(20, 50, 20);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 200;
+    dirLight.shadow.camera.left = -100;
+    dirLight.shadow.camera.right = 100;
+    dirLight.shadow.camera.top = 100;
+    dirLight.shadow.camera.bottom = -100;
+    scene.add(dirLight);
 
-  const ambLight = new THREE.AmbientLight(0x404040, 0.3);
-  scene.add(ambLight);
+    const ambLight = new THREE.AmbientLight(0x404040, 0.4);
+    scene.add(ambLight);
 
-  // Floor
-  const floorGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
-  const floorMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x444444, 
-    roughness: 0.8, 
-    metalness: 0.1 
-  });
-  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0;
-  floor.receiveShadow = true;
-  scene.add(floor);
+    // Create environment
+    createEnvironment();
+}
 
-  // Environment walls
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
-  
-  const wall1 = new THREE.Mesh(new THREE.BoxGeometry(20, 4, 1), wallMaterial);
-  wall1.position.set(0, 2, -15);
-  wall1.castShadow = true;
-  wall1.receiveShadow = true;
-  scene.add(wall1);
-  
-  const wall2 = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 20), wallMaterial);
-  wall2.position.set(-15, 2, 0);
-  wall2.castShadow = true;
-  wall2.receiveShadow = true;
-  scene.add(wall2);
-  
-  const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 20), wallMaterial);
-  wall3.position.set(15, 2, 0);
-  wall3.castShadow = true;
-  wall3.receiveShadow = true;
-  scene.add(wall3);
+function createEnvironment() {
+    // Floor with texture-like pattern
+    const floorGeometry = new THREE.PlaneGeometry(200, 200, 100, 100);
+    const floorMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x2d4a2d,
+        transparent: true,
+        opacity: 0.9
+    });
+    
+    // Add some height variation to floor vertices
+    const positions = floorGeometry.attributes.position;
+    for(let i = 0; i < positions.count; i++) {
+        positions.setZ(i, Math.random() * 0.1);
+    }
+    positions.needsUpdate = true;
+    floorGeometry.computeVertexNormals();
+    
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Boundary walls with more detail
+    const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+    const wallHeight = 6;
+    const boundary = 100;
+    
+    // North wall
+    const northWall = new THREE.Mesh(new THREE.BoxGeometry(boundary*2, wallHeight, 3), wallMaterial);
+    northWall.position.set(0, wallHeight/2, -boundary);
+    northWall.castShadow = true;
+    northWall.receiveShadow = true;
+    scene.add(northWall);
+    
+    // South wall
+    const southWall = new THREE.Mesh(new THREE.BoxGeometry(boundary*2, wallHeight, 3), wallMaterial);
+    southWall.position.set(0, wallHeight/2, boundary);
+    southWall.castShadow = true;
+    southWall.receiveShadow = true;
+    scene.add(southWall);
+    
+    // East wall
+    const eastWall = new THREE.Mesh(new THREE.BoxGeometry(3, wallHeight, boundary*2), wallMaterial);
+    eastWall.position.set(boundary, wallHeight/2, 0);
+    eastWall.castShadow = true;
+    eastWall.receiveShadow = true;
+    scene.add(eastWall);
+    
+    // West wall
+    const westWall = new THREE.Mesh(new THREE.BoxGeometry(3, wallHeight, boundary*2), wallMaterial);
+    westWall.position.set(-boundary, wallHeight/2, 0);
+    westWall.castShadow = true;
+    westWall.receiveShadow = true;
+    scene.add(westWall);
+
+    // Create structured cover areas
+    createCoverStructures();
+    
+    // Add decorative elements
+    createDecorations();
+}
+
+function createCoverStructures() {
+    const coverMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+    const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+    
+    // Central fortress-like structure
+    const centralBase = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 20), coverMaterial);
+    centralBase.position.set(0, 0.5, 0);
+    centralBase.castShadow = true;
+    centralBase.receiveShadow = true;
+    scene.add(centralBase);
+    
+    // Four corner towers on central structure
+    const towerPositions = [
+        {x: -8, z: -8}, {x: 8, z: -8}, {x: -8, z: 8}, {x: 8, z: 8}
+    ];
+    
+    towerPositions.forEach(pos => {
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 3), pillarMaterial);
+        tower.position.set(pos.x, 3, pos.z);
+        tower.castShadow = true;
+        tower.receiveShadow = true;
+        scene.add(tower);
+        
+        // Add small platforms on towers
+        const platform = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4), coverMaterial);
+        platform.position.set(pos.x, 4.2, pos.z);
+        platform.castShadow = true;
+        platform.receiveShadow = true;
+        scene.add(platform);
+    });
+    
+    // Outer ring of structures
+    const outerStructures = [
+        // Long barriers
+        {pos: {x: 40, y: 1.5, z: 0}, size: {x: 2, y: 3, z: 25}},
+        {pos: {x: -40, y: 1.5, z: 0}, size: {x: 2, y: 3, z: 25}},
+        {pos: {x: 0, y: 1.5, z: 40}, size: {x: 25, y: 3, z: 2}},
+        {pos: {x: 0, y: 1.5, z: -40}, size: {x: 25, y: 3, z: 2}},
+        
+        // Corner bunkers
+        {pos: {x: 60, y: 2, z: 60}, size: {x: 8, y: 4, z: 8}},
+        {pos: {x: -60, y: 2, z: 60}, size: {x: 8, y: 4, z: 8}},
+        {pos: {x: 60, y: 2, z: -60}, size: {x: 8, y: 4, z: 8}},
+        {pos: {x: -60, y: 2, z: -60}, size: {x: 8, y: 4, z: 8}},
+        
+        // Mid-field obstacles
+        {pos: {x: 25, y: 1, z: 25}, size: {x: 4, y: 2, z: 12}},
+        {pos: {x: -25, y: 1, z: -25}, size: {x: 4, y: 2, z: 12}},
+        {pos: {x: 25, y: 1, z: -25}, size: {x: 12, y: 2, z: 4}},
+        {pos: {x: -25, y: 1, z: 25}, size: {x: 12, y: 2, z: 4}}
+    ];
+    
+    outerStructures.forEach(struct => {
+        const obstacle = new THREE.Mesh(
+            new THREE.BoxGeometry(struct.size.x, struct.size.y, struct.size.z), 
+            coverMaterial
+        );
+        obstacle.position.set(struct.pos.x, struct.pos.y, struct.pos.z);
+        obstacle.castShadow = true;
+        obstacle.receiveShadow = true;
+        scene.add(obstacle);
+    });
+    
+    // Add some cylindrical pillars for variety
+    const pillarGeometry = new THREE.CylinderGeometry(1, 1, 5, 12);
+    const pillarPositions = [
+        {x: 15, z: 0}, {x: -15, z: 0}, {x: 0, z: 15}, {x: 0, z: -15},
+        {x: 35, z: 20}, {x: -35, z: -20}, {x: 20, z: -35}, {x: -20, z: 35}
+    ];
+    
+    pillarPositions.forEach(pos => {
+        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        pillar.position.set(pos.x, 2.5, pos.z);
+        pillar.castShadow = true;
+        pillar.receiveShadow = true;
+        scene.add(pillar);
+    });
+}
+
+function createDecorations() {
+    // Add some scattered debris/rocks
+    const debrisMaterial = new THREE.MeshLambertMaterial({ color: 0x3a3a3a });
+    
+    for(let i = 0; i < 30; i++) {
+        const size = Math.random() * 0.8 + 0.2;
+        const debris = new THREE.Mesh(
+            new THREE.BoxGeometry(size, size, size), 
+            debrisMaterial
+        );
+        
+        debris.position.set(
+            (Math.random() - 0.5) * 180,
+            size / 2,
+            (Math.random() - 0.5) * 180
+        );
+        
+        debris.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+        
+        debris.castShadow = true;
+        debris.receiveShadow = true;
+        scene.add(debris);
+    }
+    
+    // Add some "tech" looking elements
+    const techMaterial = new THREE.MeshLambertMaterial({ color: 0x666699 });
+    
+    // Communication towers
+    for(let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2;
+        const radius = 75;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        
+        // Tower base
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 2), techMaterial);
+        base.position.set(x, 1, z);
+        base.castShadow = true;
+        base.receiveShadow = true;
+        scene.add(base);
+        
+        // Tower mast
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8), techMaterial);
+        mast.position.set(x, 6, z);
+        mast.castShadow = true;
+        scene.add(mast);
+        
+        // Tower top
+        const top = new THREE.Mesh(new THREE.BoxGeometry(1, 0.5, 1), techMaterial);
+        top.position.set(x, 10.25, z);
+        top.castShadow = true;
+        scene.add(top);
+    }
+    
+    // Add some glowing elements for atmosphere
+    const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.6
+    });
+    
+    // Glowing orbs in corners
+    const orbPositions = [
+        {x: 80, y: 2, z: 80}, {x: -80, y: 2, z: 80}, 
+        {x: 80, y: 2, z: -80}, {x: -80, y: 2, z: -80}
+    ];
+    
+    orbPositions.forEach(pos => {
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), glowMaterial);
+        orb.position.set(pos.x, pos.y, pos.z);
+        scene.add(orb);
+        
+        // Add point light for each orb
+        const light = new THREE.PointLight(0x00ffff, 0.5, 20);
+        light.position.copy(orb.position);
+        scene.add(light);
+    });
 }
 
 // ============= NETWORK =============
 function connect() {
-  console.log("🌐 Connecting to server...");
-  
-  const statusEl = document.getElementById('status');
-  const btnConnect = document.getElementById('btnConnect');
-  
-  if(ws && ws.readyState === WebSocket.OPEN) {
-    console.log("🔴 Disconnecting...");
-    ws.close();
-    return;
-  }
+    console.log("🌐 Connecting to server...");
+    
+    const statusEl = document.getElementById('status');
+    const btnConnect = document.getElementById('btnConnect');
+    
+    if(ws && ws.readyState === WebSocket.OPEN) {
+        console.log("🔴 Disconnecting...");
+        ws.close();
+        return;
+    }
 
-  ws = new WebSocket("ws://localhost:8765");
+    ws = new WebSocket(serverURL);
+    lastPingTime = performance.now();
 
-  ws.onopen = () => {
-    console.log("✅ Connected to server!");
-    statusEl.textContent = "connected";
-    btnConnect.textContent = "Disconnetti";
-    ws.send(JSON.stringify({ name: "Player" + Math.floor(Math.random()*1000) }));
-  };
+    ws.onopen = () => {
+        console.log("✅ Connected to server!");
+        statusEl.textContent = "Connected";
+        statusEl.style.color = "#00ff00";
+        btnConnect.textContent = "Disconnect";
+        
+        // Send initial message
+        ws.send(JSON.stringify({ 
+            name: "Player" + Math.floor(Math.random() * 1000),
+            type: "join"
+        }));
+    };
 
-  ws.onerror = (error) => {
-    console.error("❌ WebSocket error:", error);
-    statusEl.textContent = "error";
-  };
+    ws.onerror = (error) => {
+        console.error("❌ WebSocket error:", error);
+        statusEl.textContent = "Connection Error";
+        statusEl.style.color = "#ff0000";
+    };
 
-  ws.onclose = (event) => {
-    console.log("🔴 Connection closed:", event.code, event.reason);
-    statusEl.textContent = "disconnected";
-    btnConnect.textContent = "Connetti";
-  };
+    ws.onclose = (event) => {
+        console.log("🔴 Connection closed:", event.code, event.reason);
+        statusEl.textContent = "Disconnected";
+        statusEl.style.color = "#ff4444";
+        btnConnect.textContent = "Connect to Server";
+        
+        // Clear players
+        Object.values(players).forEach(player => player.remove());
+        Object.values(weapons).forEach(weapon => weapon.remove());
+    };
 
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    handleServerMessage(msg);
-  };
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg);
+        
+        // Update ping
+        const ping = performance.now() - lastPingTime;
+        document.getElementById('ping').textContent = Math.round(ping);
+    };
 }
 
 function handleServerMessage(msg) {
-  // console.log("📨", msg.type, msg);
-  
-  switch(msg.type) {
-    case "welcome":
-      myId = msg.id;
-      console.log("🎯 My ID:", myId);
-      break;
-      
-    case "state":
-      // Update players
-      if(msg.players) {
-        msg.players.forEach(p => {
-          if(!players[p.id]) new Player(p.id);
-          
-          // Sync local player from server (with prediction)
-          if(p.id === myId) {
-            const dx = Math.abs(localPlayer.x - p.x);
-            const dz = Math.abs(localPlayer.z - p.z);
-            if(dx > 2 || dz > 2) {
-              localPlayer.x = p.x;
-              localPlayer.z = p.z;
-            }
-            localPlayer.health = p.health;
-            localPlayer.weapon = p.weapon;
-            localPlayer.ammo = p.ammo || 0;
+    switch(msg.type) {
+        case "welcome":
+            myId = msg.id;
+            console.log("🎯 My ID:", myId);
+            break;
             
-            // Update HUD
-            document.getElementById('health-text').textContent = localPlayer.health;
-            document.getElementById('health-fill').style.width = localPlayer.health + '%';
-            if(p.weapon) {
-              document.getElementById('hud_weapon').innerText = `Arma: ${p.weapon.toUpperCase()}`;
-              document.getElementById('hud_ammo').innerText = `Munizioni: ${localPlayer.ammo}`;
+        case "state":
+            // Update players
+            if(msg.players) {
+                msg.players.forEach(p => {
+                    if(!players[p.id]) {
+                        new Player(p.id, p.x, p.y, p.z);
+                    }
+                    
+                    // Sync local player from server with client-side prediction
+                    if(p.id === myId) {
+                        const dx = Math.abs(localPlayer.x - p.x);
+                        const dz = Math.abs(localPlayer.z - p.z);
+                        
+                        // Only sync if too far off (handles server authority)
+                        if(dx > 3 || dz > 3) {
+                            localPlayer.x = p.x;
+                            localPlayer.z = p.z;
+                        }
+                        
+                        localPlayer.health = p.health;
+                        localPlayer.weapon = p.weapon;
+                        localPlayer.ammo = p.ammo || 0;
+                        
+                        // Update HUD
+                        updateHUD();
+                    }
+                    
+                    // Update player data
+                    Object.assign(players[p.id], p);
+                });
+
+                // Remove disconnected players
+                const activeIds = new Set(msg.players.map(p => p.id));
+                Object.keys(players).forEach(id => {
+                    if(!activeIds.has(id)) {
+                        players[id].remove();
+                    }
+                });
             }
-          }
-          
-          Object.assign(players[p.id], p);
-        });
 
-        // Remove disconnected players
-        const activeIds = new Set(msg.players.map(p => p.id));
-        Object.keys(players).forEach(id => {
-          if(!activeIds.has(id)) {
-            players[id].remove();
-          }
-        });
-      }
+            // Update weapons
+            if(msg.weapons) {
+                // Remove weapons not in the update
+                const activeWeaponIds = new Set(msg.weapons.map(w => w.id));
+                Object.keys(weapons).forEach(id => {
+                    if(!activeWeaponIds.has(id)) {
+                        weapons[id].remove();
+                    }
+                });
+                
+                // Add or update weapons
+                msg.weapons.forEach(w => {
+                    if(!weapons[w.id]) {
+                        new Weapon(w.id, w.type, w.x, w.y, w.z);
+                    } else {
+                        weapons[w.id].x = w.x;
+                        weapons[w.id].y = w.y;
+                        weapons[w.id].z = w.z;
+                        weapons[w.id].mesh.position.set(w.x, w.y, w.z);
+                    }
+                });
+            }
+            break;
+            
+        case "weapon_pickup":
+            localPlayer.weapon = msg.weapon;
+            localPlayer.ammo = msg.ammo;
+            updateHUD();
+            console.log(`🔫 Picked up: ${msg.weapon} with ${msg.ammo} ammo`);
+            break;
+            
+        case "weapon_spawn":
+            console.log("🔫 New weapon spawned:", msg.type);
+            if(!weapons[msg.id]) {
+                new Weapon(msg.id, msg.type, msg.x, msg.y, msg.z);
+            }
+            break;
+            
+        case "weapon_remove":
+            if(weapons[msg.id]) {
+                weapons[msg.id].remove();
+            }
+            break;
+            
+        case "got_hit":
+            console.log(`💥 Hit by ${msg.by}! Health: ${msg.health}`);
+            localPlayer.takeDamage();
+            localPlayer.health = msg.health;
+            updateHUD();
+            break;
+            
+        case "hit":
+            console.log(`🎯 You hit ${msg.target}! Their health: ${msg.health}`);
+            // Could add hit marker here
+            break;
+            
+        case "kill":
+            console.log(`☠️ ${msg.killer} killed ${msg.victim}`);
+            showKillFeed(msg.killer, msg.victim);
+            break;
+            
+        case "join":
+            console.log(`👋 ${msg.id} joined the game`);
+            break;
+            
+        case "leave":
+            console.log(`👋 ${msg.id} left the game`);
+            if(players[msg.id]) {
+                players[msg.id].remove();
+            }
+            break;
+    }
+}
 
-      // Update weapons
-      if(msg.weapons) {
-        msg.weapons.forEach(w => {
-          if(!weapons[w.id]) {
-            new Weapon(w.id, w.type, w.x, w.y, w.z);
-          } else {
-            weapons[w.id].mesh.position.set(w.x, w.y, w.z);
-          }
-        });
-      }
-      break;
-      
-    case "weapon_pickup":
-      localPlayer.weapon = msg.weapon;
-      localPlayer.ammo = msg.ammo;
-      document.getElementById('hud_weapon').innerText = `Arma: ${msg.weapon.toUpperCase()}`;
-      document.getElementById('hud_ammo').innerText = `Munizioni: ${msg.ammo}`;
-      console.log(`🔫 Picked up: ${msg.weapon} with ${msg.ammo} ammo`);
-      break;
-      
-    case "weapon_spawn":
-      console.log("🔫 New weapon spawned:", msg.type);
-      if(!weapons[msg.id]) {
-        new Weapon(msg.id, msg.type, msg.x, msg.y, msg.z);
-      }
-      break;
-      
-    case "weapon_remove":
-      if(weapons[msg.id]) {
-        weapons[msg.id].remove();
-      }
-      break;
-      
-    case "got_hit":
-      console.log(`💥 Hit by ${msg.by}! Health: ${msg.health}`);
-      localPlayer.takeDamage();
-      localPlayer.health = msg.health;
-      break;
-      
-    case "hit":
-      console.log(`🎯 You hit ${msg.target}! Their health: ${msg.health}`);
-      break;
-      
-    case "kill":
-      console.log(`☠️ ${msg.killer} killed ${msg.victim}`);
-      const killFeed = document.getElementById('kill-feed');
-      if(killFeed) {
-        const killMsg = document.createElement('div');
-        killMsg.textContent = `${msg.killer} → ${msg.victim}`;
-        killMsg.style.color = msg.killer === myId ? '#00ff00' : '#ff4444';
-        killMsg.style.fontSize = '12px';
-        killMsg.style.marginBottom = '2px';
-        killFeed.appendChild(killMsg);
-        setTimeout(() => killMsg.remove(), 5000);
-      }
-      break;
-      
-    case "join":
-      console.log(`👋 ${msg.id} joined the game`);
-      break;
-      
-    case "leave":
-      console.log(`👋 ${msg.id} left the game`);
-      break;
-  }
+function updateHUD() {
+    document.getElementById('health-text').textContent = localPlayer.health;
+    document.getElementById('health-fill').style.width = localPlayer.health + '%';
+    
+    if(localPlayer.weapon) {
+        document.getElementById('hud_weapon').textContent = `Weapon: ${localPlayer.weapon.toUpperCase()}`;
+        document.getElementById('hud_ammo').textContent = `Ammo: ${localPlayer.ammo}`;
+    } else {
+        document.getElementById('hud_weapon').textContent = 'Weapon: NONE';
+        document.getElementById('hud_ammo').textContent = 'Ammo: 0';
+    }
+}
+
+function showKillFeed(killer, victim) {
+    const killFeed = document.getElementById('kill-feed');
+    const killMsg = document.createElement('div');
+    
+    const isMyKill = killer === myId;
+    const isMyDeath = victim === myId;
+    
+    killMsg.textContent = `${killer.slice(0, 8)} → ${victim.slice(0, 8)}`;
+    killMsg.style.borderLeftColor = isMyKill ? '#00ff00' : isMyDeath ? '#ff0000' : '#ff4444';
+    killMsg.style.color = isMyKill ? '#00ff00' : isMyDeath ? '#ff4444' : '#ffffff';
+    
+    killFeed.appendChild(killMsg);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        if(killMsg.parentNode) {
+            killMsg.parentNode.removeChild(killMsg);
+        }
+    }, 5000);
 }
 
 // ============= CONTROLS =============
 function setupControls() {
-  const btnConnect = document.getElementById('btnConnect');
-  const instructions = document.getElementById('instructions');
-  
-  console.log("🎮 Setting up controls...");
-  
-  // Connect button
-  btnConnect.addEventListener('click', () => {
-    console.log("🔘 Connect button clicked!");
-    connect();
-  });
-  
-  // Pointer lock
-  renderer.domElement.addEventListener('click', () => {
-    renderer.domElement.requestPointerLock();
-    instructions.style.display = 'none';
-  });
-  
-  document.addEventListener('pointerlockchange', () => {
-    isLocked = (document.pointerLockElement === renderer.domElement);
-    document.getElementById('crosshair').style.display = isLocked ? 'block' : 'none';
-    instructions.style.display = isLocked ? 'none' : 'block';
-  });
-  
-  // Mouse movement
-  document.addEventListener('mousemove', e => {
-    if(!isLocked) return;
-    localPlayer.yaw -= e.movementX * sensitivity;
-    localPlayer.pitch -= e.movementY * sensitivity;
-    localPlayer.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, localPlayer.pitch));
-  });
-
-  // Keyboard
-  const keyMap = {
-    'KeyW': 'forward',
-    'KeyA': 'left',
-    'KeyS': 'backward',
-    'KeyD': 'right',
-    'ShiftLeft': 'run',
-    'ControlLeft': 'crouch',
-    'KeyE': 'interact'
-  };
-  
-  window.addEventListener('keydown', e => {
-    const action = keyMap[e.code]; 
-    if(action){ 
-      localPlayer.keys[action] = true; 
-      e.preventDefault(); 
-    }
-  });
-  
-  window.addEventListener('keyup', e => {
-    const action = keyMap[e.code]; 
-    if(action){ 
-      localPlayer.keys[action] = false; 
-      e.preventDefault(); 
-    }
-  });
-
-  // Mouse shooting
-  renderer.domElement.addEventListener('mousedown', e => {
-    if(e.button !== 0 || !isLocked) return;
+    console.log("🎮 Setting up controls...");
     
-    const dir = {
-      x: Math.sin(localPlayer.yaw), 
-      y: -Math.sin(localPlayer.pitch), 
-      z: Math.cos(localPlayer.yaw)
+    const btnConnect = document.getElementById('btnConnect');
+    const instructions = document.getElementById('instructions');
+    
+    // Connect button
+    btnConnect.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log("🔘 Connect button clicked!");
+        connect();
+    });
+    
+    // Pointer lock on click
+    document.addEventListener('click', () => {
+        if(document.pointerLockElement !== renderer.domElement) {
+            renderer.domElement.requestPointerLock();
+        }
+    });
+    
+    // Pointer lock change handler
+    document.addEventListener('pointerlockchange', () => {
+        isLocked = (document.pointerLockElement === renderer.domElement);
+        document.getElementById('crosshair').style.display = isLocked ? 'block' : 'none';
+        instructions.style.display = isLocked ? 'none' : 'block';
+        
+        if(isLocked) {
+            console.log("🔒 Mouse locked - game active!");
+        } else {
+            console.log("🔓 Mouse unlocked - game paused");
+        }
+    });
+    
+    // Mouse movement
+    document.addEventListener('mousemove', (e) => {
+        if(!isLocked) return;
+        
+        localPlayer.yaw -= e.movementX * sensitivity;
+        localPlayer.pitch -= e.movementY * sensitivity;
+        localPlayer.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, localPlayer.pitch));
+    });
+
+    // Keyboard controls
+    const keyMap = {
+        'KeyW': 'forward',
+        'KeyA': 'left',
+        'KeyS': 'backward',
+        'KeyD': 'right',
+        'ShiftLeft': 'run',
+        'ShiftRight': 'run',
+        'ControlLeft': 'crouch',
+        'ControlRight': 'crouch',
+        'KeyE': 'interact',
+        'Space': 'jump'
     };
     
-    if(ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "shoot", dir }));
-    }
-    
-    createMuzzleFlash();
-    spawnTracer(localPlayer.x, localPlayer.y + 0.6, localPlayer.z, dir);
-    
-    // Update ammo display
-    if(localPlayer.ammo > 0) {
-      localPlayer.ammo--;
-      document.getElementById('hud_ammo').innerText = `Munizioni: ${localPlayer.ammo}`;
-    }
-  });
-
-  // Weapon pickup
-  window.addEventListener('keydown', e => {
-    if(e.code === 'KeyE' && isLocked) {
-      Object.values(weapons).forEach(w => {
-        const dist = Math.hypot(localPlayer.x - w.x, localPlayer.z - w.z);
-        if(dist < 2.0 && ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({type: "pickup", id: w.id}));
+    document.addEventListener('keydown', (e) => {
+        const action = keyMap[e.code]; 
+        if(action && isLocked){ 
+            localPlayer.keys[action] = true; 
+            e.preventDefault(); 
         }
-      });
+        
+        // ESC to unlock pointer
+        if(e.code === 'Escape' && isLocked) {
+            document.exitPointerLock();
+        }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        const action = keyMap[e.code]; 
+        if(action){ 
+            localPlayer.keys[action] = false; 
+            e.preventDefault(); 
+        }
+    });
+
+    // Mouse shooting
+    document.addEventListener('mousedown', (e) => {
+        if(e.button !== 0 || !isLocked) return;
+        
+        e.preventDefault();
+        shoot();
+    });
+
+    // Weapon pickup on E key
+    document.addEventListener('keydown', (e) => {
+        if(e.code === 'KeyE' && isLocked) {
+            attemptWeaponPickup();
+        }
+    });
+    
+    // Prevent context menu
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+function shoot() {
+    if(!localPlayer.weapon || localPlayer.ammo <= 0) {
+        console.log("🔫 No weapon or ammo!");
+        return;
     }
-  });
+    
+    // Calculate shoot direction from camera
+    const direction = camera.getWorldDirection(new THREE.Vector3());
+    
+    if(ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ 
+            type: "shoot", 
+            dir: {
+                x: direction.x,
+                y: direction.y,
+                z: direction.z
+            }
+        }));
+    }
+    
+    // Visual effects
+    createMuzzleFlash();
+    spawnTracer(localPlayer.x, localPlayer.y + 0.6, localPlayer.z, direction);
+    
+    // Update local ammo (will be corrected by server)
+    if(localPlayer.ammo > 0) {
+        localPlayer.ammo--;
+        updateHUD();
+    }
+    
+    console.log(`🔫 Shot fired! Ammo: ${localPlayer.ammo}`);
+}
+
+function attemptWeaponPickup() {
+    // Check for nearby weapons
+    Object.values(weapons).forEach(weapon => {
+        const dist = Math.hypot(
+            localPlayer.x - weapon.x, 
+            localPlayer.z - weapon.z
+        );
+        
+        if(dist < 2.0) {
+            if(ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "pickup", 
+                    id: weapon.id
+                }));
+                console.log(`🔫 Attempting to pickup ${weapon.type}`);
+            }
+        }
+    });
 }
 
 // ============= GAME LOOP =============
 function animate() {
-  requestAnimationFrame(animate);
-  
-  const now = performance.now();
-  const dt = Math.min((now - lastFrame) / 1000, 1/30);
-  lastFrame = now;
+    requestAnimationFrame(animate);
+    
+    const now = performance.now();
+    const dt = Math.min((now - lastFrame) / 1000, 1/30); // Cap at 30 FPS minimum
+    lastFrame = now;
 
-  // Update local player
-  localPlayer.update(dt);
+    // Update local player (client-side prediction)
+    localPlayer.update(dt);
 
-  // Update other players
-  Object.values(players).forEach(player => {
-    player.update(dt);
-  });
+    // Update other players
+    Object.values(players).forEach(player => {
+        player.update(dt);
+    });
 
-  // Update weapons
-  Object.values(weapons).forEach(weapon => {
-    weapon.update(dt);
-  });
+    // Update weapons (spinning animation)
+    Object.values(weapons).forEach(weapon => {
+        weapon.update(dt);
+    });
 
-  // Update projectiles
-  updateProjectiles(dt);
+    // Update projectiles/tracers
+    updateProjectiles(dt);
 
-  renderer.render(scene, camera);
+    // Render the scene
+    renderer.render(scene, camera);
 }
 
 // ============= INITIALIZATION =============
-document.addEventListener('DOMContentLoaded', () => {
-  console.log("📄 DOM loaded!");
-  initScene();
-  setupControls();
-  animate();
-  console.log("🚀 Multiplayer FPS initialized!");
-  console.log("💡 Click 'Connetti' to join the server!");
+function init() {
+    console.log("🚀 Initializing Multiplayer FPS...");
+    
+    initScene();
+    setupControls();
+    
+    // Start the game loop
+    animate();
+    
+    // Set initial HUD state
+    updateHUD();
+    
+    console.log("✅ Game initialized!");
+    console.log("💡 Click 'Connect to Server' to join the game!");
+    console.log("🎮 Make sure your Python server is running on ws://localhost:8765");
+}
+
+// Start everything when page loads
+document.addEventListener('DOMContentLoaded', init);
+
+// Handle page visibility changes
+document.addEventListener('visibilitychange', () => {
+    if(document.hidden) {
+        // Pause game when tab is not visible
+        Object.keys(localPlayer.keys).forEach(key => {
+            localPlayer.keys[key] = false;
+        });
+    }
 });
+
+// Handle window beforeunload
+window.addEventListener('beforeunload', () => {
+    if(ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+    }
+});
+
+console.log("🎯 Multiplayer FPS Client Ready!");
 </script>
 
 </body>
