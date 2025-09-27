@@ -25,7 +25,6 @@
             background: #000;
             color: white;
             overflow: hidden;
-            cursor: none;
         }
 
         #hud {
@@ -165,6 +164,10 @@
         canvas {
             display: block;
             background: #111;
+        }
+        
+        canvas.locked {
+            cursor: none;
         }
 
         .damage-overlay {
@@ -1091,6 +1094,7 @@ function handleServerMessage(msg) {
         case "weapon_pickup":
             localPlayer.weapon = msg.weapon;
             localPlayer.ammo = msg.ammo;
+            localPlayer.updateWeaponModel();
             updateHUD();
             console.log(`🔫 Picked up: ${msg.weapon} with ${msg.ammo} ammo`);
             break;
@@ -1199,9 +1203,14 @@ function setupControls() {
         document.getElementById('crosshair').style.display = isLocked ? 'block' : 'none';
         instructions.style.display = isLocked ? 'none' : 'block';
         
+        // Update cursor visibility
         if(isLocked) {
+            renderer.domElement.classList.add('locked');
+            document.body.style.cursor = 'none';
             console.log("🔒 Mouse locked - game active!");
         } else {
+            renderer.domElement.classList.remove('locked');
+            document.body.style.cursor = 'default';
             console.log("🔓 Mouse unlocked - game paused");
         }
     });
@@ -1293,6 +1302,9 @@ function shoot() {
     createMuzzleFlash();
     spawnTracer(localPlayer.x, localPlayer.y + 0.6, localPlayer.z, direction);
     
+    // Recoil animation
+    localPlayer.animateRecoil();
+    
     // Update local ammo (will be corrected by server)
     if(localPlayer.ammo > 0) {
         localPlayer.ammo--;
@@ -1356,6 +1368,9 @@ function init() {
     
     initScene();
     setupControls();
+    
+    // Create first-person body
+    localPlayer.createBody();
     
     // Start the game loop
     animate();
