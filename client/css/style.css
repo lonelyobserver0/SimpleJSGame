@@ -1,0 +1,86 @@
+body {
+  margin:0;
+  overflow:hidden;
+  background:#111;
+  color:#ddd;
+  font-family:'Courier New', monospace;
+  cursor:none;
+}
+
+#hud {
+  position:absolute;
+  top:10px;
+  left:10px;
+  z-index:10;
+  background: rgba(0,0,0,0.5);
+  padding:10px;
+  border-radius:8px;
+  width:220px;
+}
+
+#health-bar {
+  width:100%;
+  height:20px;
+  background:#222;
+  border:2px solid #666;
+  border-radius:10px;
+  margin:6px 0;
+  overflow:hidden;
+}
+
+#health-fill {
+  width:100%;
+  height:100%;
+  background: linear-gradient(90deg,#ff4444,#ffaa44,#44ff44);
+  transition: width 0.3s ease;
+}
+
+#weapon-info {
+  margin-bottom:6px;
+}
+
+#kill-feed {
+  font-size:12px;
+  max-height:80px;
+  overflow-y:auto;
+}
+
+#btnConnect {
+  cursor:pointer;
+  padding:4px 8px;
+  border:none;
+  border-radius:4px;
+  background:#0077ff;
+  color:white;
+  font-weight:bold;
+}
+
+#btnConnect:hover { background:#0055cc; }
+
+#crosshair {
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:5;
+  pointer-events:none;
+}
+
+.crosshair-line {
+  position:absolute;
+  background:rgba(255,255,255,0.8);
+}
+
+.crosshair-h {
+  width:20px;
+  height:2px;
+  top:-1px;
+  left:-10px;
+}
+
+.crosshair-v {
+  width:2px;
+  height:20px;
+  top:-10px;
+  left:-1px;
+}
