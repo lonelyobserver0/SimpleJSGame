@@ -1,31 +1,56 @@
 #!/usr/bin/env python3
 import asyncio, websockets, json, time, math, uuid, random
 
-# CONFIG
+# ==================== CONFIG ====================
 TICK_RATE = 20
 BROADCAST_RATE = 20
 MOVE_SPEED = 5.0
 RUN_MULTIPLIER = 1.8
 CROUCH_MULTIPLIER = 0.5
 MAX_HEALTH = 100
+MAX_ARMOR = 100
 RESPAWN_TIME = 5.0
 
+# Weapon configurations
 WEAPON_DATA = {
     "pistol": {"damage": 20, "range": 25, "mag": 12, "fire_rate": 0.4},
     "rifle": {"damage": 34, "range": 35, "mag": 30, "fire_rate": 0.1},
-    "shotgun": {"damage": 10, "range": 15, "pellets": 5, "mag": 8, "fire_rate": 1.0}
+    "shotgun": {"damage": 10, "range": 15, "pellets": 5, "mag": 8, "fire_rate": 1.0},
+    "sniper": {"damage": 80, "range": 100, "mag": 5, "fire_rate": 1.5},
+    "smg": {"damage": 18, "range": 20, "mag": 40, "fire_rate": 0.05}
 }
 
 WEAPON_SPAWN_INTERVAL = 5.0
-WEAPON_MAX = 10
+WEAPON_MAX = 15
 
-# GLOBAL STATE
+# Powerup configurations
+POWERUP_TYPES = ["health", "armor", "speed"]
+POWERUP_SPAWN_INTERVAL = 8.0
+POWERUP_MAX = 8
+
+# Grenade configuration
+GRENADE_DAMAGE = 80
+GRENADE_RADIUS = 10.0
+
+# Game mode configurations
+GAME_MODES = {
+    "deathmatch": {"teams": False, "score_limit": 30},
+    "team_deathmatch": {"teams": True, "score_limit": 50},
+    "capture_flag": {"teams": True, "flags": True},
+    "king_hill": {"teams": False, "hill": True}
+}
+
+# ==================== GLOBAL STATE ====================
 clients = {}       # ws -> pid
 players = {}       # pid -> player dict
 weapons = {}       # wid -> weapon dict
-projectiles = []   # list of {pos, dir, owner, type, time}
+powerups = {}      # pwid -> powerup dict
+projectiles = []   # list of projectiles
+grenades = []      # list of grenades
+game_mode = "deathmatch"
+team_scores = {"red": 0, "blue": 0}
 
-# UTILS
+# ==================== UTILITY FUNCTIONS ====================
 def now(): 
     return time.time()
 
@@ -39,7 +64,16 @@ def normalize(v):
 def rotate_yaw_forward(yaw, amt=1.0): 
     return (math.sin(yaw)*amt, math.cos(yaw)*amt)
 
-# NOTIFY
+def distance(p1, p2):
+    return math.sqrt((p1["x"] - p2["x"])**2 + (p1["z"] - p2["z"])**2)
+
+def assign_team():
+    """Assign player to team with fewer players"""
+    red_count = sum(1 for p in players.values() if p.get("team") == "red")
+    blue_count = sum(1 for p in players.values() if p.get("team") == "blue")
+    return "red" if red_count <= blue_count else "blue"
+
+# ==================== NOTIFICATION FUNCTIONS ====================
 async def notify_player_byid(pid, msg):
     for ws, _pid in clients.items():
         if _pid == pid:
@@ -52,20 +86,38 @@ async def notify_all(msg):
     data = json.dumps(msg)
     await asyncio.gather(*[ws.send(data) for ws in clients.keys()], return_exceptions=True)
 
-# BROADCAST STATE
+async def notify_team(team, msg):
+    data = json.dumps(msg)
+    team_clients = [ws for ws, pid in clients.items() if players.get(pid, {}).get("team") == team]
+    await asyncio.gather(*[ws.send(data) for ws in team_clients], return_exceptions=True)
+
+# ==================== BROADCAST STATE ====================
 async def broadcast_state():
     snapshot = {
         "type": "state",
         "t": now(),
-        "players": [{**p, "id": pid, "weapon": p.get("weapon"), "ammo": p.get("ammo")} for pid, p in players.items()],
+        "players": [
+            {
+                **p, 
+                "id": pid, 
+                "weapon": p.get("weapon"), 
+                "ammo": p.get("ammo"),
+                "armor": p.get("armor", 0),
+                "team": p.get("team"),
+                "kills": p.get("kills", 0),
+                "deaths": p.get("deaths", 0)
+            } for pid, p in players.items()
+        ],
         "weapons": list(weapons.values()),
-        "projectiles": [p for p in projectiles]
+        "powerups": list(powerups.values()),
+        "team_scores": team_scores if GAME_MODES[game_mode].get("teams") else None
     }
     await notify_all(snapshot)
 
-# PHYSICS
+# ==================== PHYSICS ====================
 async def physics_tick(dt):
     B = 100  # boundary
+    
     for pid, p in players.items():
         if p["health"] <= 0: 
             continue
@@ -75,7 +127,7 @@ async def physics_tick(dt):
         fwd = rotate_yaw_forward(p["yaw"])
         rgt = rotate_yaw_forward(p["yaw"] + math.pi/2)
         
-        # Movement (fixed to match client)
+        # Movement
         if keys.get("w"): 
             dx += fwd[0]
             dz += fwd[1]
@@ -103,33 +155,75 @@ async def physics_tick(dt):
             
         p["x"] = max(-B, min(B, p["x"] + dx))
         p["z"] = max(-B, min(B, p["z"] + dz))
+        
+        # Check powerup pickups
+        for pwid, pw in list(powerups.items()):
+            dist = math.sqrt((p["x"] - pw["x"])**2 + (p["z"] - pw["z"])**2)
+            if dist < 1.5:
+                await handle_powerup_pickup(pid, pwid)
 
-# RESPAWN SYSTEM
+# ==================== POWERUP SYSTEM ====================
+async def handle_powerup_pickup(pid, pwid):
+    if pwid not in powerups:
+        return
+        
+    pw = powerups.pop(pwid)
+    p = players[pid]
+    
+    if pw["type"] == "health":
+        p["health"] = min(MAX_HEALTH, p["health"] + 50)
+    elif pw["type"] == "armor":
+        p["armor"] = min(MAX_ARMOR, p.get("armor", 0) + 50)
+    elif pw["type"] == "speed":
+        # Speed boost handled client-side
+        pass
+    
+    await notify_player_byid(pid, {
+        "type": "powerup_pickup",
+        "powerup_type": pw["type"],
+        "id": pwid
+    })
+    
+    await notify_all({"type": "powerup_remove", "id": pwid})
+    print(f"[⚡] Player {pid} picked up {pw['type']} powerup")
+
+# ==================== RESPAWN SYSTEM ====================
 async def handle_respawn(pid):
     """Respawn a dead player after delay"""
     await asyncio.sleep(RESPAWN_TIME)
     
-    if pid in players:
-        p = players[pid]
-        p["health"] = MAX_HEALTH
-        p["weapon"] = None
-        p["ammo"] = 0
+    if pid not in players:
+        return
         
-        # Random spawn position
+    p = players[pid]
+    p["health"] = MAX_HEALTH
+    p["armor"] = 0
+    p["weapon"] = None
+    p["ammo"] = 0
+    
+    # Team-based spawns
+    if p.get("team") == "red":
+        p["x"] = random.uniform(-80, -40)
+        p["z"] = random.uniform(-50, 50)
+    elif p.get("team") == "blue":
+        p["x"] = random.uniform(40, 80)
+        p["z"] = random.uniform(-50, 50)
+    else:
         p["x"] = random.uniform(-50, 50)
         p["z"] = random.uniform(-50, 50)
-        p["y"] = 1.0
-        
-        await notify_player_byid(pid, {
-            "type": "respawn",
-            "x": p["x"],
-            "y": p["y"],
-            "z": p["z"]
-        })
-        
-        print(f"[↻] Player {pid} respawned at ({p['x']:.1f}, {p['z']:.1f})")
+    
+    p["y"] = 1.0
+    
+    await notify_player_byid(pid, {
+        "type": "respawn",
+        "x": p["x"],
+        "y": p["y"],
+        "z": p["z"]
+    })
+    
+    print(f"[↻] Player {pid} respawned at ({p['x']:.1f}, {p['z']:.1f})")
 
-# HANDLE MESSAGE
+# ==================== MESSAGE HANDLER ====================
 async def handle_message(ws, msg):
     pid = clients.get(ws)
     if not pid or pid not in players: 
@@ -166,38 +260,39 @@ async def handle_message(ws, msg):
         dirv = normalize((msg["dir"]["x"], msg["dir"]["y"], msg["dir"]["z"]))
         
         # Handle shotgun pellets
-        if weapon_name == "shotgun":
-            for _ in range(weapon.get("pellets", 1)):
+        num_projectiles = weapon.get("pellets", 1)
+        for i in range(num_projectiles):
+            if num_projectiles > 1:
                 # Add spread for shotgun
                 spread = 0.1
                 spread_x = dirv[0] + random.uniform(-spread, spread)
                 spread_y = dirv[1] + random.uniform(-spread, spread)
                 spread_z = dirv[2] + random.uniform(-spread, spread)
-                spread_dir = normalize((spread_x, spread_y, spread_z))
-                
-                projectiles.append({
-                    "pos": [p["x"], p["y"] + 0.8, p["z"]],
-                    "dir": [spread_dir[0], spread_dir[1], spread_dir[2]],
-                    "owner": pid,
-                    "type": weapon_name,
-                    "time": now()
-                })
-        else:
+                shoot_dir = normalize((spread_x, spread_y, spread_z))
+            else:
+                shoot_dir = dirv
+            
             projectiles.append({
                 "pos": [p["x"], p["y"] + 0.8, p["z"]],
-                "dir": [dirv[0], dirv[1], dirv[2]],
+                "dir": [shoot_dir[0], shoot_dir[1], shoot_dir[2]],
                 "owner": pid,
                 "type": weapon_name,
                 "time": now()
             })
             
+    elif mtype == "grenade_explode":
+        pos = msg.get("pos", {})
+        await handle_grenade_explosion(pid, pos)
+        
     elif mtype == "pickup":
         if p["health"] <= 0:
             return
             
-        wid = msg.get("id")
-        if wid in weapons:
-            wp = weapons.pop(wid)
+        pickup_id = msg.get("id")
+        pickup_type = msg.get("pickupType", "weapon")
+        
+        if pickup_type == "weapon" and pickup_id in weapons:
+            wp = weapons.pop(pickup_id)
             p["weapon"] = wp["type"]
             p["ammo"] = WEAPON_DATA[wp["type"]]["mag"]
             
@@ -205,42 +300,137 @@ async def handle_message(ws, msg):
                 "type": "weapon_pickup",
                 "weapon": wp["type"],
                 "ammo": p["ammo"],
-                "id": wid
+                "id": pickup_id
             })
-            await notify_all({"type": "weapon_remove", "id": wid})
+            await notify_all({"type": "weapon_remove", "id": pickup_id})
             print(f"[🔫] Player {pid} picked up {wp['type']}")
             
+        elif pickup_type == "powerup" and pickup_id in powerups:
+            await handle_powerup_pickup(pid, pickup_id)
+            
+    elif mtype == "chat":
+        message = msg.get("message", "")
+        if len(message) > 0 and len(message) <= 200:
+            chat_msg = {
+                "type": "chat",
+                "sender": pid[:8],
+                "message": message,
+                "team": p.get("team")
+            }
+            
+            # Team chat if message starts with @
+            if message.startswith("@") and p.get("team"):
+                await notify_team(p["team"], chat_msg)
+            else:
+                await notify_all(chat_msg)
+                
     elif mtype == "respawn":
         if p["health"] <= 0:
             asyncio.create_task(handle_respawn(pid))
 
-# REGISTER / UNREGISTER
+# ==================== GRENADE SYSTEM ====================
+async def handle_grenade_explosion(owner_id, pos):
+    """Handle grenade explosion damage"""
+    ex, ey, ez = pos.get("x", 0), pos.get("y", 0), pos.get("z", 0)
+    
+    for pid, p in players.items():
+        if p["health"] <= 0:
+            continue
+            
+        # Calculate distance
+        dist = math.sqrt((p["x"] - ex)**2 + (p["y"] - ey)**2 + (p["z"] - ez)**2)
+        
+        if dist < GRENADE_RADIUS:
+            # Damage falls off with distance
+            damage_mult = 1.0 - (dist / GRENADE_RADIUS)
+            damage = int(GRENADE_DAMAGE * damage_mult)
+            
+            # Apply armor protection
+            armor = p.get("armor", 0)
+            if armor > 0:
+                armor_absorb = min(armor, damage // 2)
+                damage -= armor_absorb
+                p["armor"] = armor - armor_absorb
+            
+            p["health"] = max(0, p["health"] - damage)
+            
+            await notify_player_byid(pid, {
+                "type": "got_hit",
+                "by": owner_id,
+                "health": p["health"],
+                "damage": damage
+            })
+            
+            if p["health"] == 0:
+                p["deaths"] = p.get("deaths", 0) + 1
+                
+                if owner_id in players:
+                    players[owner_id]["kills"] = players[owner_id].get("kills", 0) + 1
+                
+                await notify_all({
+                    "type": "kill",
+                    "killer": owner_id,
+                    "victim": pid
+                })
+                
+                print(f"[💥] {owner_id} killed {pid} with grenade")
+                asyncio.create_task(handle_respawn(pid))
+
+# ==================== REGISTER / UNREGISTER ====================
 async def register(ws, info):
     pid = str(uuid.uuid4())[:8]
     clients[ws] = pid
     
-    # Better spawn distribution
-    spawn_x = random.uniform(-50, 50)
-    spawn_z = random.uniform(-50, 50)
+    mode = info.get("mode", "deathmatch")
+    team = None
+    
+    if GAME_MODES.get(mode, {}).get("teams"):
+        team = assign_team()
+    
+    # Team-based spawn positions
+    if team == "red":
+        spawn_x = random.uniform(-80, -40)
+        spawn_z = random.uniform(-50, 50)
+    elif team == "blue":
+        spawn_x = random.uniform(40, 80)
+        spawn_z = random.uniform(-50, 50)
+    else:
+        spawn_x = random.uniform(-50, 50)
+        spawn_z = random.uniform(-50, 50)
     
     players[pid] = {
         "id": pid,
+        "name": info.get("name", f"Player{pid[:4]}"),
         "x": spawn_x,
         "y": 1.0,
         "z": spawn_z,
         "yaw": 0,
         "pitch": 0,
         "health": MAX_HEALTH,
+        "armor": 0,
         "keys": {},
         "weapon": None,
         "ammo": 0,
         "kills": 0,
-        "deaths": 0
+        "deaths": 0,
+        "team": team
     }
     
-    await ws.send(json.dumps({"type": "welcome", "id": pid, "t": now()}))
-    await notify_all({"type": "join", "id": pid})
-    print(f"[+] Player {pid} joined at ({spawn_x:.1f}, {spawn_z:.1f})")
+    await ws.send(json.dumps({
+        "type": "welcome", 
+        "id": pid, 
+        "team": team,
+        "t": now()
+    }))
+    
+    await notify_all({
+        "type": "join", 
+        "id": pid,
+        "team": team
+    })
+    
+    team_str = f" (Team: {team})" if team else ""
+    print(f"[+] Player {pid} joined{team_str} at ({spawn_x:.1f}, {spawn_z:.1f})")
 
 async def unregister(ws):
     pid = clients.pop(ws, None)
@@ -249,7 +439,7 @@ async def unregister(ws):
         await notify_all({"type": "leave", "id": pid})
         print(f"[-] Player {pid} left")
 
-# HANDLER
+# ==================== CONNECTION HANDLER ====================
 async def handler(ws):
     try:
         intro = await asyncio.wait_for(ws.recv(), timeout=5)
@@ -273,7 +463,7 @@ async def handler(ws):
     finally: 
         await unregister(ws)
 
-# WEAPON SPAWN LOOP
+# ==================== SPAWN LOOPS ====================
 async def spawn_weapon_loop():
     while True:
         await asyncio.sleep(WEAPON_SPAWN_INTERVAL)
@@ -294,7 +484,27 @@ async def spawn_weapon_loop():
         await notify_all({"type": "weapon_spawn", **weapons[wid]})
         print(f"[🔫] Spawned {wtype} at ({weapons[wid]['x']:.1f}, {weapons[wid]['z']:.1f})")
 
-# PROJECTILE LOOP
+async def spawn_powerup_loop():
+    while True:
+        await asyncio.sleep(POWERUP_SPAWN_INTERVAL)
+        if len(powerups) >= POWERUP_MAX:
+            continue
+            
+        pwid = str(uuid.uuid4())[:8]
+        pwtype = random.choice(POWERUP_TYPES)
+        
+        powerups[pwid] = {
+            "id": pwid,
+            "type": pwtype,
+            "x": random.uniform(-80, 80),
+            "y": 1.0,
+            "z": random.uniform(-80, 80)
+        }
+        
+        await notify_all({"type": "powerup_spawn", **powerups[pwid]})
+        print(f"[⚡] Spawned {pwtype} powerup at ({powerups[pwid]['x']:.1f}, {powerups[pwid]['z']:.1f})")
+
+# ==================== PROJECTILE LOOP ====================
 async def projectile_loop(dt):
     speed = 50.0
     while True:
@@ -311,6 +521,10 @@ async def projectile_loop(dt):
             for oid, op in players.items():
                 if oid == proj["owner"] or op["health"] <= 0: 
                     continue
+                
+                # Team check for team modes
+                if players[proj["owner"]].get("team") == op.get("team") and op.get("team"):
+                    continue
                     
                 dx = op["x"] - proj["pos"][0]
                 dy = op["y"] - proj["pos"][1]
@@ -318,6 +532,14 @@ async def projectile_loop(dt):
                 
                 if math.sqrt(dx*dx + dy*dy + dz*dz) < 1.0:
                     damage = WEAPON_DATA[proj["type"]]["damage"]
+                    
+                    # Apply armor protection
+                    armor = op.get("armor", 0)
+                    if armor > 0:
+                        armor_absorb = min(armor, damage // 2)
+                        damage -= armor_absorb
+                        op["armor"] = armor - armor_absorb
+                    
                     op["health"] = max(0, op["health"] - damage)
                     
                     await notify_player_byid(oid, {
@@ -339,6 +561,11 @@ async def projectile_loop(dt):
                         
                         if proj["owner"] in players:
                             players[proj["owner"]]["kills"] = players[proj["owner"]].get("kills", 0) + 1
+                            
+                            # Team score
+                            killer_team = players[proj["owner"]].get("team")
+                            if killer_team:
+                                team_scores[killer_team] = team_scores.get(killer_team, 0) + 1
                         
                         await notify_all({
                             "type": "kill",
@@ -347,8 +574,6 @@ async def projectile_loop(dt):
                         })
                         
                         print(f"[☠️] {proj['owner']} killed {oid}")
-                        
-                        # Auto respawn after delay
                         asyncio.create_task(handle_respawn(oid))
                     
                     remove.append(proj)
@@ -365,7 +590,7 @@ async def projectile_loop(dt):
                 
         await asyncio.sleep(dt)
 
-# MAIN LOOP
+# ==================== MAIN LOOPS ====================
 async def main_loop():
     dt = 1.0/TICK_RATE
     while True:
@@ -378,26 +603,37 @@ async def broadcaster_loop():
         await broadcast_state()
         await asyncio.sleep(dt)
 
-# START SERVER
+# ==================== SERVER START ====================
 if __name__ == "__main__":
     async def main():
-        print("=" * 60)
-        print("🎮 MULTIPLAYER FPS SERVER")
-        print("=" * 60)
+        print("=" * 70)
+        print("🎮 MULTIPLAYER FPS SERVER - COMPLETE EDITION")
+        print("=" * 70)
         print(f"📡 Starting server on ws://0.0.0.0:8765")
         print(f"⚙️  Tick Rate: {TICK_RATE} Hz")
         print(f"📤 Broadcast Rate: {BROADCAST_RATE} Hz")
         print(f"🔫 Weapons: {', '.join(WEAPON_DATA.keys())}")
+        print(f"⚡ Powerups: {', '.join(POWERUP_TYPES)}")
+        print(f"🎮 Game Modes: {', '.join(GAME_MODES.keys())}")
         print(f"💀 Respawn Time: {RESPAWN_TIME}s")
-        print("=" * 60)
+        print("=" * 70)
         
         async with websockets.serve(handler, "0.0.0.0", 8765, ping_interval=None):
             asyncio.create_task(main_loop())
             asyncio.create_task(broadcaster_loop())
             asyncio.create_task(spawn_weapon_loop())
+            asyncio.create_task(spawn_powerup_loop())
             asyncio.create_task(projectile_loop(1.0/TICK_RATE))
             
             print("✅ Server is running! Waiting for players...")
+            print("🎯 Features enabled:")
+            print("   • Team Deathmatch")
+            print("   • Power-ups (Health, Armor, Speed)")
+            print("   • Advanced weapons (Pistol, Rifle, Shotgun, Sniper, SMG)")
+            print("   • Grenades")
+            print("   • Chat system")
+            print("   • XP & Leveling")
+            print("   • Leaderboard")
             print("Press Ctrl+C to stop")
             print()
             
@@ -407,3 +643,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n\n🛑 Server stopped by user")
+        print("Thanks for playing!")
