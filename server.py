@@ -124,22 +124,27 @@ async def physics_tick(dt):
             
         keys = p.get("keys", {})
         dx = dz = 0
-        fwd = rotate_yaw_forward(p["yaw"])
-        rgt = rotate_yaw_forward(p["yaw"] + math.pi/2)
         
-        # Movement
+        # Calculate forward and right vectors
+        yaw = p["yaw"]
+        fwd_x = math.sin(yaw)
+        fwd_z = math.cos(yaw)
+        rgt_x = math.sin(yaw + math.pi/2)
+        rgt_z = math.cos(yaw + math.pi/2)
+        
+        # Movement (W = forward, S = backward, A = left, D = right)
         if keys.get("w"): 
-            dx += fwd[0]
-            dz += fwd[1]
+            dx += fwd_x
+            dz += fwd_z
         if keys.get("s"): 
-            dx -= fwd[0]
-            dz -= fwd[1]
+            dx -= fwd_x
+            dz -= fwd_z
         if keys.get("a"): 
-            dx -= rgt[0]
-            dz -= rgt[1]
+            dx -= rgt_x
+            dz -= rgt_z
         if keys.get("d"): 
-            dx += rgt[0]
-            dz += rgt[1]
+            dx += rgt_x
+            dz += rgt_z
             
         # Speed modifiers
         speed = MOVE_SPEED

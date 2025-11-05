@@ -948,14 +948,28 @@ const localPlayer = {
         
         let dx = 0, dz = 0;
         const yaw = this.yaw;
-        const forward = {x: -Math.sin(yaw), z: -Math.cos(yaw)};
-        const right = {x: -Math.sin(yaw + Math.PI/2), z: -Math.cos(yaw + Math.PI/2)};
         
-        // FIXED: W = forward, S = backward
-        if(this.keys.forward) { dx += forward.x; dz += forward.z; }
-        if(this.keys.backward){ dx -= forward.x; dz -= forward.z; }
-        if(this.keys.left){ dx += right.x; dz += right.z; }
-        if(this.keys.right){ dx -= right.x; dz -= right.z; }
+        // Calculate forward and right vectors (same as server)
+        const forward = {x: Math.sin(yaw), z: Math.cos(yaw)};
+        const right = {x: Math.sin(yaw + Math.PI/2), z: Math.cos(yaw + Math.PI/2)};
+        
+        // Apply movement (W = forward, S = backward)
+        if(this.keys.forward) { 
+            dx += forward.x; 
+            dz += forward.z; 
+        }
+        if(this.keys.backward){ 
+            dx -= forward.x; 
+            dz -= forward.z; 
+        }
+        if(this.keys.left){ 
+            dx -= right.x; 
+            dz -= right.z; 
+        }
+        if(this.keys.right){ 
+            dx += right.x; 
+            dz += right.z; 
+        }
 
         let baseSpeed = 5.0;
         const isRunning = this.keys.run;
@@ -971,32 +985,35 @@ const localPlayer = {
 
         const L = Math.hypot(dx, dz);
         const isMoving = L > 0;
-        if(isMoving){ dx = dx/L * baseSpeed; dz = dz/L * baseSpeed; }
-
-        const accel = 15.0, decel = 12.0;
-        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, dx, dt * (isMoving ? accel : decel));
-        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, dz, dt * (isMoving ? accel : decel));
         
-        this.x += this.velocity.x * dt; 
-        this.z += this.velocity.z * dt;
-        this.y = THREE.MathUtils.lerp(this.y, isCrouching ? 0.7 : 1.0, dt * 8);
+        if(isMoving){ 
+            dx = dx/L * baseSpeed; 
+            dz = dz/L * baseSpeed; 
+        }
 
+        // Instant movement - no interpolation
+        this.x += dx * dt; 
+        this.z += dz * dt;
+        this.y = isCrouching ? 0.7 : 1.0;
+
+        // Camera follows instantly
         camera.position.set(this.x, this.y + 0.6, this.z);
         camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
         
         this.animateArms(dt, isMoving, isRunning, isCrouching);
         
+        // INVERTED: Send inverted keys to server to match movement
         this.serverKeys = {
-            w: this.keys.forward || false,
-            s: this.keys.backward || false, 
-            a: this.keys.left || false,
-            d: this.keys.right || false,
+            w: this.keys.backward || false,  // S sends W
+            s: this.keys.forward || false,   // W sends S
+            a: this.keys.left || false,      // A sends A (fixed)
+            d: this.keys.right || false,     // D sends D (fixed)
             shift: this.keys.run || false,
             ctrl: this.keys.crouch || false
         };
         
         const now = performance.now();
-        if(ws && ws.readyState === WebSocket.OPEN && now - lastInputSent > 50) {
+        if(ws && ws.readyState === WebSocket.OPEN && now - lastInputSent > 16) {
             ws.send(JSON.stringify({
                 type: "input",
                 input: {
@@ -1171,11 +1188,15 @@ class Player {
 
     update(dt) {
         if(this.id !== myId) {
-            this.mesh.position.lerp(new THREE.Vector3(this.x, this.y, this.z), dt * 10);
-            this.mesh.rotation.y = THREE.MathUtils.lerpAngle(this.mesh.rotation.y, this.yaw, dt * 8);
+            // Smooth interpolation for other players
+            const targetPos = new THREE.Vector3(this.x, this.y, this.z);
+            this.mesh.position.lerp(targetPos, dt * 15);
+            this.mesh.rotation.y = THREE.MathUtils.lerpAngle(this.mesh.rotation.y, this.yaw, dt * 10);
         } else {
+            // For local player, position exactly (camera follows this)
             this.mesh.position.set(this.x, this.y, this.z);
             this.mesh.rotation.y = this.yaw;
+            this.mesh.visible = false; // Hide local player mesh
         }
     }
 
@@ -2086,14 +2107,19 @@ function handleServerMessage(msg) {
                     }
                     
                     if(p.id === myId) {
+                        // Only update from server if there's major desync
                         const dx = Math.abs(localPlayer.x - p.x);
                         const dz = Math.abs(localPlayer.z - p.z);
                         
-                        if(dx > 3 || dz > 3) {
+                        // Only hard correct for major desync
+                        if(dx > 10 || dz > 10) {
                             localPlayer.x = p.x;
                             localPlayer.z = p.z;
+                            console.log("🔄 Major desync corrected");
                         }
+                        // Otherwise trust client position (client-side prediction)
                         
+                        // Check for death
                         if(p.health <= 0 && localPlayer.health > 0) {
                             localPlayer.die();
                         }
@@ -2472,24 +2498,27 @@ function animate() {
     requestAnimationFrame(animate);
     
     const now = performance.now();
-    const dt = Math.min((now - lastFrame) / 1000, 1/30);
+    const dt = (now - lastFrame) / 1000;
     lastFrame = now;
+    
+    // Cap delta time to prevent large jumps
+    const cappedDt = Math.min(dt, 1/30);
 
-    localPlayer.update(dt);
+    localPlayer.update(cappedDt);
 
     Object.values(players).forEach(player => {
-        player.update(dt);
+        player.update(cappedDt);
     });
 
     Object.values(weapons).forEach(weapon => {
-        weapon.update(dt);
+        weapon.update(cappedDt);
     });
     
     Object.values(powerups).forEach(powerup => {
-        powerup.update(dt);
+        powerup.update(cappedDt);
     });
 
-    updateProjectiles(dt);
+    updateProjectiles(cappedDt);
     updateMinimap();
 
     renderer.render(scene, camera);
