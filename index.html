@@ -563,25 +563,46 @@ const localPlayer = {
     createBody() {
         const armGroup = new THREE.Group();
         
-        const leftArmGeometry = new THREE.CapsuleGeometry(0.08, 0.6, 4, 8);
+        // Left arm (more detailed)
         const armMaterial = new THREE.MeshLambertMaterial({ color: 0xffdbac });
-        this.leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
-        this.leftArm.position.set(-0.3, -0.2, -0.5);
-        this.leftArm.rotation.x = 0.3;
-        armGroup.add(this.leftArm);
         
-        this.rightArm = new THREE.Mesh(leftArmGeometry, armMaterial);
-        this.rightArm.position.set(0.3, -0.2, -0.4);
-        this.rightArm.rotation.x = 0.2;
-        armGroup.add(this.rightArm);
+        // Upper arm
+        const upperArmGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.35, 8);
+        this.leftUpperArm = new THREE.Mesh(upperArmGeo, armMaterial);
+        this.leftUpperArm.position.set(-0.25, -0.1, -0.4);
+        this.leftUpperArm.rotation.z = 0.2;
+        this.leftUpperArm.rotation.x = 0.5;
+        armGroup.add(this.leftUpperArm);
         
-        const handGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+        // Lower arm
+        const lowerArmGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.3, 8);
+        this.leftLowerArm = new THREE.Mesh(lowerArmGeo, armMaterial);
+        this.leftLowerArm.position.set(-0.32, -0.35, -0.65);
+        this.leftLowerArm.rotation.x = 0.3;
+        this.leftLowerArm.rotation.z = 0.1;
+        armGroup.add(this.leftLowerArm);
+        
+        // Right arm
+        this.rightUpperArm = new THREE.Mesh(upperArmGeo, armMaterial);
+        this.rightUpperArm.position.set(0.25, -0.1, -0.35);
+        this.rightUpperArm.rotation.z = -0.2;
+        this.rightUpperArm.rotation.x = 0.4;
+        armGroup.add(this.rightUpperArm);
+        
+        this.rightLowerArm = new THREE.Mesh(lowerArmGeo, armMaterial);
+        this.rightLowerArm.position.set(0.32, -0.35, -0.6);
+        this.rightLowerArm.rotation.x = 0.2;
+        this.rightLowerArm.rotation.z = -0.1;
+        armGroup.add(this.rightLowerArm);
+        
+        // Hands
+        const handGeometry = new THREE.SphereGeometry(0.07, 8, 8);
         this.leftHand = new THREE.Mesh(handGeometry, armMaterial);
-        this.leftHand.position.set(-0.35, -0.5, -0.8);
+        this.leftHand.position.set(-0.38, -0.52, -0.85);
         armGroup.add(this.leftHand);
         
         this.rightHand = new THREE.Mesh(handGeometry, armMaterial);
-        this.rightHand.position.set(0.35, -0.5, -0.7);
+        this.rightHand.position.set(0.38, -0.52, -0.8);
         armGroup.add(this.rightHand);
         
         this.armsMesh = armGroup;
@@ -596,36 +617,189 @@ const localPlayer = {
         
         if(!this.weapon) return;
         
-        let weaponGeometry, weaponMaterial;
+        const weaponGroup = new THREE.Group();
+        let mainBody, barrel, stock, magazine;
         
         switch(this.weapon) {
             case 'pistol':
-                weaponGeometry = new THREE.BoxGeometry(0.08, 0.15, 0.25);
-                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+                // Pistol body
+                mainBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.12, 0.18),
+                    new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8, roughness: 0.3 })
+                );
+                weaponGroup.add(mainBody);
+                
+                // Barrel
+                barrel = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.015, 0.015, 0.12, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.2 })
+                );
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, 0.04, -0.15);
+                weaponGroup.add(barrel);
+                
+                // Grip
+                const grip = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.06, 0.08, 0.04),
+                    new THREE.MeshStandardMaterial({ color: 0x222222 })
+                );
+                grip.position.set(0, -0.08, 0.02);
+                weaponGroup.add(grip);
                 break;
+                
             case 'rifle':
-                weaponGeometry = new THREE.BoxGeometry(0.06, 0.12, 0.8);
-                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+                // Body
+                mainBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.1, 0.5),
+                    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.4 })
+                );
+                weaponGroup.add(mainBody);
+                
+                // Barrel
+                barrel = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.02, 0.02, 0.4, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.9, roughness: 0.1 })
+                );
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, 0.03, -0.45);
+                weaponGroup.add(barrel);
+                
+                // Stock
+                stock = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.06, 0.08, 0.15),
+                    new THREE.MeshStandardMaterial({ color: 0x4a2511 })
+                );
+                stock.position.set(0, -0.02, 0.32);
+                weaponGroup.add(stock);
+                
+                // Magazine
+                magazine = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.12, 0.08),
+                    new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+                );
+                magazine.position.set(0, -0.11, 0.05);
+                weaponGroup.add(magazine);
                 break;
+                
             case 'shotgun':
-                weaponGeometry = new THREE.BoxGeometry(0.08, 0.15, 0.6);
-                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+                // Body
+                mainBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.1, 0.12, 0.45),
+                    new THREE.MeshStandardMaterial({ color: 0x3d2817, metalness: 0.3, roughness: 0.7 })
+                );
+                weaponGroup.add(mainBody);
+                
+                // Double barrel
+                const barrel1 = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.9 })
+                );
+                barrel1.rotation.x = Math.PI / 2;
+                barrel1.position.set(-0.03, 0.04, -0.4);
+                weaponGroup.add(barrel1);
+                
+                const barrel2 = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.9 })
+                );
+                barrel2.rotation.x = Math.PI / 2;
+                barrel2.position.set(0.03, 0.04, -0.4);
+                weaponGroup.add(barrel2);
+                
+                // Stock
+                stock = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.1, 0.2),
+                    new THREE.MeshStandardMaterial({ color: 0x5d3a1a })
+                );
+                stock.position.set(0, -0.01, 0.32);
+                weaponGroup.add(stock);
                 break;
+                
             case 'sniper':
-                weaponGeometry = new THREE.BoxGeometry(0.06, 0.12, 1.2);
-                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
+                // Body
+                mainBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.07, 0.09, 0.7),
+                    new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.8, roughness: 0.3 })
+                );
+                weaponGroup.add(mainBody);
+                
+                // Long barrel
+                barrel = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.018, 0.018, 0.6, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x050505, metalness: 0.95, roughness: 0.05 })
+                );
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, 0.025, -0.65);
+                weaponGroup.add(barrel);
+                
+                // Scope
+                const scope = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.03, 0.03, 0.25, 12),
+                    new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.9 })
+                );
+                scope.rotation.z = Math.PI / 2;
+                scope.position.set(0, 0.12, -0.1);
+                weaponGroup.add(scope);
+                
+                // Bipod
+                const bipodL = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.008, 0.008, 0.15, 6),
+                    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+                );
+                bipodL.position.set(-0.04, -0.12, -0.3);
+                bipodL.rotation.z = 0.3;
+                weaponGroup.add(bipodL);
+                
+                const bipodR = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.008, 0.008, 0.15, 6),
+                    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+                );
+                bipodR.position.set(0.04, -0.12, -0.3);
+                bipodR.rotation.z = -0.3;
+                weaponGroup.add(bipodR);
                 break;
+                
             case 'smg':
-                weaponGeometry = new THREE.BoxGeometry(0.06, 0.10, 0.5);
-                weaponMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+                // Compact body
+                mainBody = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.07, 0.08, 0.35),
+                    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.75, roughness: 0.35 })
+                );
+                weaponGroup.add(mainBody);
+                
+                // Short barrel
+                barrel = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.018, 0.018, 0.2, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.9 })
+                );
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, 0.02, -0.27);
+                weaponGroup.add(barrel);
+                
+                // Magazine
+                magazine = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.15, 0.06),
+                    new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+                );
+                magazine.position.set(0, -0.115, 0.05);
+                weaponGroup.add(magazine);
+                
+                // Forward grip
+                const forwardGrip = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.04, 0.08, 0.04),
+                    new THREE.MeshStandardMaterial({ color: 0x222222 })
+                );
+                forwardGrip.position.set(0, -0.08, -0.1);
+                weaponGroup.add(forwardGrip);
                 break;
+                
             default:
                 return;
         }
         
-        this.weaponMesh = new THREE.Mesh(weaponGeometry, weaponMaterial);
-        this.weaponMesh.position.set(0.2, -0.3, -0.5);
-        this.weaponMesh.rotation.y = -0.1;
+        this.weaponMesh = weaponGroup;
+        this.weaponMesh.position.set(0.18, -0.3, -0.5);
+        this.weaponMesh.rotation.y = -0.08;
         camera.add(this.weaponMesh);
     },
     
@@ -633,82 +807,94 @@ const localPlayer = {
         if(!this.armsMesh) return;
         
         const time = performance.now() * 0.001;
-        let leftArmY = -0.2;
-        let rightArmY = -0.2;
-        let leftArmZ = -0.5;
-        let rightArmZ = -0.4;
+        
+        // Base positions
+        let leftUpperY = -0.1, rightUpperY = -0.1;
+        let leftUpperZ = -0.4, rightUpperZ = -0.35;
+        let leftLowerY = -0.35, rightLowerY = -0.35;
+        let leftLowerZ = -0.65, rightLowerZ = -0.6;
         
         if(isMoving) {
-            const walkSpeed = isRunning ? 8 : 4;
-            const walkAmount = isRunning ? 0.1 : 0.05;
+            const walkSpeed = isRunning ? 10 : 5;
+            const swingAmount = isRunning ? 0.12 : 0.08;
             
-            leftArmY += Math.sin(time * walkSpeed) * walkAmount;
-            rightArmY += Math.sin(time * walkSpeed + Math.PI) * walkAmount;
-            leftArmZ += Math.cos(time * walkSpeed) * walkAmount * 0.5;
-            rightArmZ += Math.cos(time * walkSpeed + Math.PI) * walkAmount * 0.5;
-        }
-        
-        if(!isMoving) {
-            const breathAmount = 0.02;
-            leftArmY += Math.sin(time * 2) * breathAmount;
-            rightArmY += Math.sin(time * 2 + 0.5) * breathAmount;
+            // Arm swinging
+            leftUpperY += Math.sin(time * walkSpeed) * swingAmount;
+            rightUpperY += Math.sin(time * walkSpeed + Math.PI) * swingAmount;
+            
+            leftUpperZ += Math.cos(time * walkSpeed) * swingAmount * 0.3;
+            rightUpperZ += Math.cos(time * walkSpeed + Math.PI) * swingAmount * 0.3;
+        } else {
+            // Breathing animation
+            const breathAmount = 0.015;
+            leftUpperY += Math.sin(time * 1.5) * breathAmount;
+            rightUpperY += Math.sin(time * 1.5 + 0.5) * breathAmount;
         }
         
         if(isCrouching) {
-            leftArmY += 0.1;
-            rightArmY += 0.1;
-            leftArmZ -= 0.1;
-            rightArmZ -= 0.1;
+            leftUpperY += 0.08;
+            rightUpperY += 0.08;
         }
         
-        this.leftArm.position.y = THREE.MathUtils.lerp(this.leftArm.position.y, leftArmY, dt * 8);
-        this.rightArm.position.y = THREE.MathUtils.lerp(this.rightArm.position.y, rightArmY, dt * 8);
-        this.leftArm.position.z = THREE.MathUtils.lerp(this.leftArm.position.z, leftArmZ, dt * 8);
-        this.rightArm.position.z = THREE.MathUtils.lerp(this.rightArm.position.z, rightArmZ, dt * 8);
+        // Smooth interpolation
+        this.leftUpperArm.position.y = THREE.MathUtils.lerp(this.leftUpperArm.position.y, leftUpperY, dt * 10);
+        this.leftUpperArm.position.z = THREE.MathUtils.lerp(this.leftUpperArm.position.z, leftUpperZ, dt * 10);
+        this.rightUpperArm.position.y = THREE.MathUtils.lerp(this.rightUpperArm.position.y, rightUpperY, dt * 10);
+        this.rightUpperArm.position.z = THREE.MathUtils.lerp(this.rightUpperArm.position.z, rightUpperZ, dt * 10);
         
-        this.leftHand.position.y = this.leftArm.position.y - 0.3;
-        this.leftHand.position.z = this.leftArm.position.z - 0.3;
-        this.rightHand.position.y = this.rightArm.position.y - 0.3;
-        this.rightHand.position.z = this.rightArm.position.z - 0.3;
+        this.leftLowerArm.position.y = this.leftUpperArm.position.y - 0.25;
+        this.leftLowerArm.position.z = this.leftUpperArm.position.z - 0.25;
+        this.rightLowerArm.position.y = this.rightUpperArm.position.y - 0.25;
+        this.rightLowerArm.position.z = this.rightUpperArm.position.z - 0.25;
+        
+        this.leftHand.position.y = this.leftLowerArm.position.y - 0.17;
+        this.leftHand.position.z = this.leftLowerArm.position.z - 0.2;
+        this.rightHand.position.y = this.rightLowerArm.position.y - 0.17;
+        this.rightHand.position.z = this.rightLowerArm.position.z - 0.2;
         
         if(this.weaponMesh) {
             let weaponY = -0.3;
             let weaponZ = -0.5;
             
             if(isMoving) {
-                const bobAmount = isRunning ? 0.08 : 0.04;
-                weaponY += Math.sin(time * (isRunning ? 8 : 4)) * bobAmount;
-                weaponZ += Math.cos(time * (isRunning ? 8 : 4)) * bobAmount * 0.5;
+                const bobAmount = isRunning ? 0.1 : 0.06;
+                const bobSpeed = isRunning ? 10 : 5;
+                weaponY += Math.sin(time * bobSpeed) * bobAmount;
+                weaponZ += Math.cos(time * bobSpeed * 0.5) * bobAmount * 0.5;
             }
             
             if(isCrouching) {
                 weaponY += 0.05;
-                weaponZ -= 0.1;
+                weaponZ -= 0.08;
             }
             
-            this.weaponMesh.position.y = THREE.MathUtils.lerp(this.weaponMesh.position.y, weaponY, dt * 10);
-            this.weaponMesh.position.z = THREE.MathUtils.lerp(this.weaponMesh.position.z, weaponZ, dt * 10);
+            this.weaponMesh.position.y = THREE.MathUtils.lerp(this.weaponMesh.position.y, weaponY, dt * 12);
+            this.weaponMesh.position.z = THREE.MathUtils.lerp(this.weaponMesh.position.z, weaponZ, dt * 12);
         }
     },
     
     animateRecoil() {
         if(!this.weaponMesh || !this.armsMesh) return;
         
-        this.weaponMesh.rotation.x = -0.2;
-        this.weaponMesh.position.z += 0.1;
+        this.weaponMesh.rotation.x = -0.25;
+        this.weaponMesh.position.z += 0.15;
         
-        this.leftArm.rotation.x += 0.1;
-        this.rightArm.rotation.x += 0.1;
+        this.leftUpperArm.rotation.x += 0.15;
+        this.rightUpperArm.rotation.x += 0.15;
+        this.leftLowerArm.rotation.x += 0.1;
+        this.rightLowerArm.rotation.x += 0.1;
         
         const resetRecoil = () => {
             if(this.weaponMesh) {
-                this.weaponMesh.rotation.x = THREE.MathUtils.lerp(this.weaponMesh.rotation.x, 0, 0.1);
-                this.weaponMesh.position.z = THREE.MathUtils.lerp(this.weaponMesh.position.z, -0.5, 0.1);
+                this.weaponMesh.rotation.x = THREE.MathUtils.lerp(this.weaponMesh.rotation.x, 0, 0.15);
+                this.weaponMesh.position.z = THREE.MathUtils.lerp(this.weaponMesh.position.z, -0.5, 0.15);
             }
             
-            if(this.leftArm && this.rightArm) {
-                this.leftArm.rotation.x = THREE.MathUtils.lerp(this.leftArm.rotation.x, 0.3, 0.1);
-                this.rightArm.rotation.x = THREE.MathUtils.lerp(this.rightArm.rotation.x, 0.2, 0.1);
+            if(this.leftUpperArm && this.rightUpperArm) {
+                this.leftUpperArm.rotation.x = THREE.MathUtils.lerp(this.leftUpperArm.rotation.x, 0.5, 0.15);
+                this.rightUpperArm.rotation.x = THREE.MathUtils.lerp(this.rightUpperArm.rotation.x, 0.4, 0.15);
+                this.leftLowerArm.rotation.x = THREE.MathUtils.lerp(this.leftLowerArm.rotation.x, 0.3, 0.15);
+                this.rightLowerArm.rotation.x = THREE.MathUtils.lerp(this.rightLowerArm.rotation.x, 0.2, 0.15);
             }
             
             if(Math.abs(this.weaponMesh?.rotation.x || 0) > 0.01) {
@@ -762,13 +948,14 @@ const localPlayer = {
         
         let dx = 0, dz = 0;
         const yaw = this.yaw;
-        const forward = {x: Math.sin(yaw), z: Math.cos(yaw)};
-        const right = {x: Math.sin(yaw + Math.PI/2), z: Math.cos(yaw + Math.PI/2)};
+        const forward = {x: -Math.sin(yaw), z: -Math.cos(yaw)};
+        const right = {x: -Math.sin(yaw + Math.PI/2), z: -Math.cos(yaw + Math.PI/2)};
         
+        // FIXED: W = forward, S = backward
         if(this.keys.forward) { dx += forward.x; dz += forward.z; }
         if(this.keys.backward){ dx -= forward.x; dz -= forward.z; }
-        if(this.keys.left){ dx -= right.x; dz -= right.z; }
-        if(this.keys.right){ dx += right.x; dz += right.z; }
+        if(this.keys.left){ dx += right.x; dz += right.z; }
+        if(this.keys.right){ dx -= right.x; dz -= right.z; }
 
         let baseSpeed = 5.0;
         const isRunning = this.keys.run;
@@ -885,33 +1072,97 @@ class Player {
         this.ammo = 0;
         this.team = team;
 
-        const geometry = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
-        let color = 0xffffff;
+        // Create detailed player model
+        const bodyGroup = new THREE.Group();
         
+        // Determine color
+        let color = 0xffffff;
         if(team === 'red') {
-            color = 0xff4444;
+            color = 0xff3333;
         } else if(team === 'blue') {
-            color = 0x4444ff;
+            color = 0x3333ff;
         } else if(id === myId) {
-            color = 0x0088ff;
+            color = 0x00aaff;
         } else {
             const colors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44, 0xff44ff, 0x44ffff];
             const colorIndex = parseInt(id.slice(-1), 16) % colors.length;
             color = colors[colorIndex];
         }
         
-        const material = new THREE.MeshLambertMaterial({ color: color });
+        const bodyMaterial = new THREE.MeshStandardMaterial({ 
+            color: color,
+            metalness: 0.2,
+            roughness: 0.8
+        });
         
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
+        // Legs
+        const legGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.5, 8);
+        const leftLeg = new THREE.Mesh(legGeo, bodyMaterial);
+        leftLeg.position.set(-0.12, 0.25, 0);
+        leftLeg.castShadow = true;
+        bodyGroup.add(leftLeg);
+        
+        const rightLeg = new THREE.Mesh(legGeo, bodyMaterial);
+        rightLeg.position.set(0.12, 0.25, 0);
+        rightLeg.castShadow = true;
+        bodyGroup.add(rightLeg);
+        
+        // Torso
+        const torsoGeo = new THREE.BoxGeometry(0.4, 0.6, 0.25);
+        const torso = new THREE.Mesh(torsoGeo, bodyMaterial);
+        torso.position.y = 0.8;
+        torso.castShadow = true;
+        bodyGroup.add(torso);
+        
+        // Arms
+        const armGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.5, 8);
+        const leftArm = new THREE.Mesh(armGeo, bodyMaterial);
+        leftArm.position.set(-0.28, 0.75, 0);
+        leftArm.rotation.z = 0.15;
+        leftArm.castShadow = true;
+        bodyGroup.add(leftArm);
+        
+        const rightArm = new THREE.Mesh(armGeo, bodyMaterial);
+        rightArm.position.set(0.28, 0.75, 0);
+        rightArm.rotation.z = -0.15;
+        rightArm.castShadow = true;
+        bodyGroup.add(rightArm);
+        
+        // Head
+        const headGeo = new THREE.SphereGeometry(0.18, 12, 12);
+        const head = new THREE.Mesh(headGeo, bodyMaterial);
+        head.position.y = 1.28;
+        head.castShadow = true;
+        bodyGroup.add(head);
+        
+        // Face details
+        const faceGeo = new THREE.BoxGeometry(0.08, 0.04, 0.02);
+        const faceMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+        
+        // Eyes
+        const leftEye = new THREE.Mesh(
+            new THREE.SphereGeometry(0.03, 8, 8),
+            faceMaterial
+        );
+        leftEye.position.set(-0.06, 1.3, 0.16);
+        bodyGroup.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(
+            new THREE.SphereGeometry(0.03, 8, 8),
+            faceMaterial
+        );
+        rightEye.position.set(0.06, 1.3, 0.16);
+        bodyGroup.add(rightEye);
+        
+        // Name tag indicator
+        const nameTagGeo = new THREE.SphereGeometry(0.08, 8, 8);
+        const nameTagMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        this.nameTag = new THREE.Mesh(nameTagGeo, nameTagMat);
+        this.nameTag.position.set(0, 1.6, 0);
+        bodyGroup.add(this.nameTag);
+        
+        this.mesh = bodyGroup;
         this.mesh.position.set(this.x, this.y, this.z);
-        
-        const nameGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const nameMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        this.nameTag = new THREE.Mesh(nameGeometry, nameMaterial);
-        this.nameTag.position.set(0, 1.8, 0);
-        this.mesh.add(this.nameTag);
         
         scene.add(this.mesh);
         players[id] = this;
@@ -1290,18 +1541,22 @@ function initScene() {
     console.log("🎮 Initializing 3D scene...");
     
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x222222);
-    scene.fog = new THREE.Fog(0x222222, 50, 200);
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 50, 200);
 
-    camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 0);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.6, 5);
+    camera.lookAt(0, 1, 0);
     
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.setClearColor(0x222222);
-    document.body.appendChild(renderer.domElement);
+    renderer.setClearColor(0x87ceeb);
+    
+    // Insert before instructions div
+    const instructions = document.getElementById('instructions');
+    document.body.insertBefore(renderer.domElement, instructions);
 
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -1309,38 +1564,46 @@ function initScene() {
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    dirLight.position.set(20, 50, 20);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight.position.set(50, 100, 50);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 200;
-    dirLight.shadow.camera.left = -100;
-    dirLight.shadow.camera.right = 100;
-    dirLight.shadow.camera.top = 100;
-    dirLight.shadow.camera.bottom = -100;
+    dirLight.shadow.camera.far = 500;
+    dirLight.shadow.camera.left = -150;
+    dirLight.shadow.camera.right = 150;
+    dirLight.shadow.camera.top = 150;
+    dirLight.shadow.camera.bottom = -150;
     scene.add(dirLight);
 
-    const ambLight = new THREE.AmbientLight(0x404040, 0.6);
+    const ambLight = new THREE.AmbientLight(0x404040, 1.0);
     scene.add(ambLight);
+    
+    // Add hemisphere light for better outdoor lighting
+    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x2d4a2d, 0.6);
+    scene.add(hemiLight);
 
     createEnvironment();
     
     console.log("✅ Scene initialized successfully!");
+    console.log("📦 Scene has", scene.children.length, "objects");
 }
 
 function createEnvironment() {
-    const floorGeometry = new THREE.PlaneGeometry(200, 200, 100, 100);
-    const floorMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x2d4a2d,
-        transparent: true,
-        opacity: 0.9
+    console.log("🏗️ Creating environment...");
+    
+    // Ground
+    const floorGeometry = new THREE.PlaneGeometry(200, 200, 50, 50);
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x4a7c4a,
+        roughness: 0.8,
+        metalness: 0.2
     });
     
     const positions = floorGeometry.attributes.position;
     for(let i = 0; i < positions.count; i++) {
-        positions.setZ(i, Math.random() * 0.1);
+        positions.setZ(i, Math.random() * 0.3);
     }
     positions.needsUpdate = true;
     floorGeometry.computeVertexNormals();
@@ -1350,106 +1613,109 @@ function createEnvironment() {
     floor.position.y = 0;
     floor.receiveShadow = true;
     scene.add(floor);
+    console.log("✅ Floor created");
 
-    const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
-    const wallHeight = 6;
+    // Walls
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x666666 });
+    const wallHeight = 8;
     const boundary = 100;
     
-    const northWall = new THREE.Mesh(new THREE.BoxGeometry(boundary*2, wallHeight, 3), wallMaterial);
-    northWall.position.set(0, wallHeight/2, -boundary);
-    northWall.castShadow = true;
-    northWall.receiveShadow = true;
-    scene.add(northWall);
+    const walls = [
+        { pos: [0, wallHeight/2, -boundary], size: [boundary*2, wallHeight, 2] },
+        { pos: [0, wallHeight/2, boundary], size: [boundary*2, wallHeight, 2] },
+        { pos: [boundary, wallHeight/2, 0], size: [2, wallHeight, boundary*2] },
+        { pos: [-boundary, wallHeight/2, 0], size: [2, wallHeight, boundary*2] }
+    ];
     
-    const southWall = new THREE.Mesh(new THREE.BoxGeometry(boundary*2, wallHeight, 3), wallMaterial);
-    southWall.position.set(0, wallHeight/2, boundary);
-    southWall.castShadow = true;
-    southWall.receiveShadow = true;
-    scene.add(southWall);
-    
-    const eastWall = new THREE.Mesh(new THREE.BoxGeometry(3, wallHeight, boundary*2), wallMaterial);
-    eastWall.position.set(boundary, wallHeight/2, 0);
-    eastWall.castShadow = true;
-    eastWall.receiveShadow = true;
-    scene.add(eastWall);
-    
-    const westWall = new THREE.Mesh(new THREE.BoxGeometry(3, wallHeight, boundary*2), wallMaterial);
-    westWall.position.set(-boundary, wallHeight/2, 0);
-    westWall.castShadow = true;
-    westWall.receiveShadow = true;
-    scene.add(westWall);
+    walls.forEach(w => {
+        const wall = new THREE.Mesh(
+            new THREE.BoxGeometry(...w.size),
+            wallMaterial
+        );
+        wall.position.set(...w.pos);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        scene.add(wall);
+    });
+    console.log("✅ Walls created");
 
     createCoverStructures();
     createDecorations();
+    
+    console.log("✅ Environment complete!");
 }
 
 function createCoverStructures() {
-    const coverMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
-    const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+    console.log("🏗️ Creating cover structures...");
     
+    const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const pillarMaterial = new THREE.MeshStandardMaterial({ color: 0x999999 });
+    
+    // Central platform
     const centralBase = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 20), coverMaterial);
     centralBase.position.set(0, 0.5, 0);
     centralBase.castShadow = true;
     centralBase.receiveShadow = true;
     scene.add(centralBase);
     
+    // Corner towers
     const towerPositions = [
         {x: -8, z: -8}, {x: 8, z: -8}, {x: -8, z: 8}, {x: 8, z: 8}
     ];
     
     towerPositions.forEach(pos => {
-        const tower = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 3), pillarMaterial);
-        tower.position.set(pos.x, 3, pos.z);
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(3, 5, 3), pillarMaterial);
+        tower.position.set(pos.x, 2.5, pos.z);
         tower.castShadow = true;
         tower.receiveShadow = true;
         scene.add(tower);
         
-        const platform = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4), coverMaterial);
-        platform.position.set(pos.x, 4.2, pos.z);
+        const platform = new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 4), coverMaterial);
+        platform.position.set(pos.x, 5.2, pos.z);
         platform.castShadow = true;
         platform.receiveShadow = true;
         scene.add(platform);
     });
     
-    const outerStructures = [
-        {pos: {x: 40, y: 1.5, z: 0}, size: {x: 2, y: 3, z: 25}},
-        {pos: {x: -40, y: 1.5, z: 0}, size: {x: 2, y: 3, z: 25}},
-        {pos: {x: 0, y: 1.5, z: 40}, size: {x: 25, y: 3, z: 2}},
-        {pos: {x: 0, y: 1.5, z: -40}, size: {x: 25, y: 3, z: 2}},
-        {pos: {x: 60, y: 2, z: 60}, size: {x: 8, y: 4, z: 8}},
-        {pos: {x: -60, y: 2, z: 60}, size: {x: 8, y: 4, z: 8}},
-        {pos: {x: 60, y: 2, z: -60}, size: {x: 8, y: 4, z: 8}},
-        {pos: {x: -60, y: 2, z: -60}, size: {x: 8, y: 4, z: 8}},
-        {pos: {x: 25, y: 1, z: 25}, size: {x: 4, y: 2, z: 12}},
-        {pos: {x: -25, y: 1, z: -25}, size: {x: 4, y: 2, z: 12}},
-        {pos: {x: 25, y: 1, z: -25}, size: {x: 12, y: 2, z: 4}},
-        {pos: {x: -25, y: 1, z: 25}, size: {x: 12, y: 2, z: 4}}
+    // Walls and obstacles
+    const obstacles = [
+        {pos: [40, 2, 0], size: [2, 4, 25]},
+        {pos: [-40, 2, 0], size: [2, 4, 25]},
+        {pos: [0, 2, 40], size: [25, 4, 2]},
+        {pos: [0, 2, -40], size: [25, 4, 2]},
+        {pos: [25, 1.5, 25], size: [5, 3, 12]},
+        {pos: [-25, 1.5, -25], size: [5, 3, 12]},
+        {pos: [25, 1.5, -25], size: [12, 3, 5]},
+        {pos: [-25, 1.5, 25], size: [12, 3, 5]}
     ];
     
-    outerStructures.forEach(struct => {
+    obstacles.forEach(obs => {
         const obstacle = new THREE.Mesh(
-            new THREE.BoxGeometry(struct.size.x, struct.size.y, struct.size.z), 
+            new THREE.BoxGeometry(...obs.size),
             coverMaterial
         );
-        obstacle.position.set(struct.pos.x, struct.pos.y, struct.pos.z);
+        obstacle.position.set(...obs.pos);
         obstacle.castShadow = true;
         obstacle.receiveShadow = true;
         scene.add(obstacle);
     });
     
-    const pillarGeometry = new THREE.CylinderGeometry(1, 1, 5, 12);
+    // Pillars
+    const pillarGeometry = new THREE.CylinderGeometry(1, 1, 6, 12);
     const pillarPositions = [
-        {x: 15, z: 0}, {x: -15, z: 0}, {x: 0, z: 15}, {x: 0, z: -15},
-        {x: 35, z: 20}, {x: -35, z: -20}, {x: 20, z: -35}, {x: -20, z: 35}
+        [15, 3, 0], [-15, 3, 0], [0, 3, 15], [0, 3, -15],
+        [35, 3, 20], [-35, 3, -20], [20, 3, -35], [-20, 3, 35]
     ];
     
     pillarPositions.forEach(pos => {
         const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        pillar.position.set(pos.x, 2.5, pos.z);
+        pillar.position.set(...pos);
         pillar.castShadow = true;
         pillar.receiveShadow = true;
         scene.add(pillar);
     });
+    
+    console.log("✅ Cover structures created");
 }
 
 function createDecorations() {
@@ -2233,18 +2499,38 @@ function animate() {
 function init() {
     console.log("🚀 Initializing Multiplayer FPS - Complete Edition...");
     
-    initScene();
-    setupControls();
-    localPlayer.createBody();
-    animate();
-    updateHUD();
-    
-    addChatMessage('SYSTEM', 'Welcome to Multiplayer FPS!');
-    addChatMessage('SYSTEM', 'Press T to chat, /help for commands');
-    
-    console.log("✅ Game initialized!");
-    console.log("💡 Choose a game mode to start!");
+    try {
+        initScene();
+        setupControls();
+        localPlayer.createBody();
+        
+        // Make sure rendering starts immediately
+        renderer.render(scene, camera);
+        
+        animate();
+        updateHUD();
+        
+        addChatMessage('SYSTEM', 'Welcome to Multiplayer FPS!');
+        addChatMessage('SYSTEM', 'Press T to chat, /help for commands');
+        
+        console.log("✅ Game initialized successfully!");
+        console.log("💡 Choose a game mode to start!");
+        console.log("📊 Scene objects:", scene.children.length);
+        console.log("🎥 Camera position:", camera.position);
+    } catch(error) {
+        console.error("❌ Initialization error:", error);
+        alert("Error initializing game. Check console for details.");
+    }
 }
+
+// Force initial render after a short delay
+setTimeout(() => {
+    if(renderer && scene && camera) {
+        console.log("🔄 Forcing initial render...");
+        renderer.render(scene, camera);
+        console.log("✅ Initial render complete");
+    }
+}, 100);
 
 document.addEventListener('DOMContentLoaded', init);
 
