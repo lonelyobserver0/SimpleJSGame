@@ -955,12 +955,12 @@ const localPlayer = {
         
         // Apply movement (W = forward, S = backward)
         if(this.keys.forward) { 
-            dx += forward.x; 
-            dz += forward.z; 
-        }
-        if(this.keys.backward){ 
             dx -= forward.x; 
             dz -= forward.z; 
+        }
+        if(this.keys.backward){ 
+            dx += forward.x; 
+            dz += forward.z; 
         }
         if(this.keys.left){ 
             dx -= right.x; 
@@ -1004,10 +1004,10 @@ const localPlayer = {
         
         // INVERTED: Send inverted keys to server to match movement
         this.serverKeys = {
-            w: this.keys.backward || false,  // S sends W
-            s: this.keys.forward || false,   // W sends S
-            a: this.keys.left || false,      // A sends A (fixed)
-            d: this.keys.right || false,     // D sends D (fixed)
+            w: this.keys.forward || false,
+            s: this.keys.backward || false,
+            a: this.keys.left || false,
+            d: this.keys.right || false,
             shift: this.keys.run || false,
             ctrl: this.keys.crouch || false
         };
