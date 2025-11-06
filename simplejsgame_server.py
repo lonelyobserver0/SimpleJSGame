@@ -132,8 +132,8 @@ async def physics_tick(dt):
         rgt_x = math.sin(yaw + math.pi/2)
         rgt_z = math.cos(yaw + math.pi/2)
         
-        # Movement (W = forward, S = backward, A = left, D = right)
-        if keys.get("w"):
+        # Movement (W = backward with -=, S = forward with += - INVERTED)
+        if keys.get("w"): 
             dx -= fwd_x
             dz -= fwd_z
         if keys.get("s"): 
@@ -649,3 +649,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\n🛑 Server stopped by user")
         print("Thanks for playing!")
+        

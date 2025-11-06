@@ -535,7 +535,7 @@ let gameMode = "deathmatch";
 let myTeam = null;
 
 const sensitivity = 0.002;
-const serverURL = "ws://localhost:8765";
+const serverURL = "ws://217.154.149.234:8765";
 
 // ============= LOCAL PLAYER =============
 const localPlayer = {
@@ -955,12 +955,12 @@ const localPlayer = {
         
         // Apply movement (W = forward, S = backward)
         if(this.keys.forward) { 
-            dx -= forward.x; 
-            dz -= forward.z; 
-        }
-        if(this.keys.backward){ 
             dx += forward.x; 
             dz += forward.z; 
+        }
+        if(this.keys.backward){ 
+            dx -= forward.x; 
+            dz -= forward.z; 
         }
         if(this.keys.left){ 
             dx -= right.x; 
@@ -1004,10 +1004,10 @@ const localPlayer = {
         
         // INVERTED: Send inverted keys to server to match movement
         this.serverKeys = {
-            w: this.keys.forward || false,
-            s: this.keys.backward || false,
-            a: this.keys.left || false,
-            d: this.keys.right || false,
+            w: this.keys.backward || false,  // S sends W
+            s: this.keys.forward || false,   // W sends S
+            a: this.keys.left || false,      // A sends A (fixed)
+            d: this.keys.right || false,     // D sends D (fixed)
             shift: this.keys.run || false,
             ctrl: this.keys.crouch || false
         };
