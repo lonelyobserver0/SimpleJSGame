@@ -3,6 +3,9 @@ import asyncio, websockets, json, time, math, uuid, random
 from collections import defaultdict
 import hashlib
 import secrets
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 
 # ==================== CONFIG ====================
 TICK_RATE = 20
