@@ -533,6 +533,13 @@ let shotsFired = 0;
 let shotsHit = 0;
 let gameMode = "deathmatch";
 let myTeam = null;
+let connectionAttempts = 0;
+let maxReconnectAttempts = 5;
+let reconnectDelay = 3000;
+let isReconnecting = false;
+let messageQueue = [];
+let lastMessageTime = 0;
+let messageRateLimit = 30; // messages per second
 
 const sensitivity = 0.002;
 const serverURL = "ws://217.154.149.234:8765";
@@ -953,14 +960,14 @@ const localPlayer = {
         const forward = {x: Math.sin(yaw), z: Math.cos(yaw)};
         const right = {x: Math.sin(yaw + Math.PI/2), z: Math.cos(yaw + Math.PI/2)};
         
-        // Apply movement (W = forward, S = backward)
+        // Apply movement (W = backward, S = forward - INVERTED)
         if(this.keys.forward) { 
-            dx += forward.x; 
-            dz += forward.z; 
-        }
-        if(this.keys.backward){ 
             dx -= forward.x; 
             dz -= forward.z; 
+        }
+        if(this.keys.backward){ 
+            dx += forward.x; 
+            dz += forward.z; 
         }
         if(this.keys.left){ 
             dx -= right.x; 
@@ -1004,24 +1011,24 @@ const localPlayer = {
         
         // INVERTED: Send inverted keys to server to match movement
         this.serverKeys = {
-            w: this.keys.backward || false,  // S sends W
-            s: this.keys.forward || false,   // W sends S
-            a: this.keys.left || false,      // A sends A (fixed)
-            d: this.keys.right || false,     // D sends D (fixed)
+            w: this.keys.forward || false,   // W sends W
+            s: this.keys.backward || false,  // S sends S
+            a: this.keys.left || false,      // A sends A
+            d: this.keys.right || false,     // D sends D
             shift: this.keys.run || false,
             ctrl: this.keys.crouch || false
         };
         
         const now = performance.now();
         if(ws && ws.readyState === WebSocket.OPEN && now - lastInputSent > 16) {
-            ws.send(JSON.stringify({
+            sendSecureMessage({
                 type: "input",
                 input: {
                     yaw: this.yaw,
                     pitch: this.pitch,
                     keys: this.serverKeys
                 }
-            }));
+            });
             lastInputSent = now;
         }
     },
@@ -1072,9 +1079,7 @@ const localPlayer = {
         const respawnOverlay = document.getElementById('respawnOverlay');
         respawnOverlay.classList.remove('active');
         
-        if(ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({type: "respawn"}));
-        }
+        sendSecureMessage({type: "respawn"});
     }
 };
 
@@ -2029,8 +2034,72 @@ function showKillFeed(killer, victim) {
     }, 5000);
 }
 
+// ============= SECURITY FUNCTIONS =============
+function sanitizeInput(str, maxLength = 100) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/[<>]/g, '').slice(0, maxLength);
+}
+
+function validateServerData(data) {
+    if (!data || typeof data !== 'object') return false;
+    
+    // Validate player data
+    if (data.players && Array.isArray(data.players)) {
+        for (let p of data.players) {
+            if (typeof p.x !== 'number' || typeof p.z !== 'number') return false;
+            if (Math.abs(p.x) > 150 || Math.abs(p.z) > 150) return false; // Out of bounds
+            if (typeof p.health !== 'number' || p.health < 0 || p.health > 100) return false;
+        }
+    }
+    
+    return true;
+}
+
+function rateLimitMessage() {
+    const now = performance.now();
+    const timeSinceLastMessage = now - lastMessageTime;
+    
+    if (timeSinceLastMessage < 1000 / messageRateLimit) {
+        return false; // Rate limited
+    }
+    
+    lastMessageTime = now;
+    return true;
+}
+
+function sendSecureMessage(msg) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.warn("Cannot send message: not connected");
+        return false;
+    }
+    
+    if (!rateLimitMessage()) {
+        console.warn("Message rate limited");
+        return false;
+    }
+    
+    try {
+        const jsonStr = JSON.stringify(msg);
+        if (jsonStr.length > 4096) { // Max message size
+            console.warn("Message too large");
+            return false;
+        }
+        
+        ws.send(jsonStr);
+        return true;
+    } catch (e) {
+        console.error("Error sending message:", e);
+        return false;
+    }
+}
+
 // ============= NETWORK =============
 function connect(mode = 'deathmatch') {
+    if (isReconnecting) {
+        console.log("Already attempting to reconnect...");
+        return;
+    }
+    
     console.log("🌐 Connecting to server...");
     
     gameMode = mode;
@@ -2043,48 +2112,110 @@ function connect(mode = 'deathmatch') {
         return;
     }
 
-    ws = new WebSocket(serverURL);
-    lastPingTime = performance.now();
-
-    ws.onopen = () => {
-        console.log("✅ Connected to server!");
-        statusEl.textContent = "Connected";
-        statusEl.style.color = "#00ff00";
-        btnConnect.textContent = "Disconnect";
+    try {
+        ws = new WebSocket(serverURL);
+        ws.binaryType = 'arraybuffer';
+        lastPingTime = performance.now();
         
-        ws.send(JSON.stringify({ 
-            name: "Player" + Math.floor(Math.random() * 1000),
-            type: "join",
-            mode: mode
-        }));
-        
-        addChatMessage('SYSTEM', `Connected to ${mode} mode!`);
-    };
+        // Connection timeout
+        const connectionTimeout = setTimeout(() => {
+            if (ws.readyState !== WebSocket.OPEN) {
+                console.log("⏱️ Connection timeout");
+                ws.close();
+                handleReconnect();
+            }
+        }, 10000); // 10 second timeout
 
-    ws.onerror = (error) => {
-        console.error("❌ WebSocket error:", error);
-        statusEl.textContent = "Connection Error";
+        ws.onopen = () => {
+            clearTimeout(connectionTimeout);
+            console.log("✅ Connected to server!");
+            statusEl.textContent = "Connected";
+            statusEl.style.color = "#00ff00";
+            btnConnect.textContent = "Disconnect";
+            connectionAttempts = 0;
+            isReconnecting = false;
+            
+            const playerName = sanitizeInput(`Player${Math.floor(Math.random() * 1000)}`, 20);
+            
+            sendSecureMessage({ 
+                name: playerName,
+                type: "join",
+                mode: mode
+            });
+            
+            addChatMessage('SYSTEM', `Connected to ${mode} mode!`);
+        };
+
+        ws.onerror = (error) => {
+            clearTimeout(connectionTimeout);
+            console.error("❌ WebSocket error:", error);
+            statusEl.textContent = "Connection Error";
+            statusEl.style.color = "#ff0000";
+            handleReconnect();
+        };
+
+        ws.onclose = (event) => {
+            clearTimeout(connectionTimeout);
+            console.log("🔴 Connection closed:", event.code, event.reason);
+            statusEl.textContent = "Disconnected";
+            statusEl.style.color = "#ff4444";
+            btnConnect.textContent = "Connect to Server";
+            
+            Object.values(players).forEach(player => player.remove());
+            Object.values(weapons).forEach(weapon => weapon.remove());
+            Object.values(powerups).forEach(powerup => powerup.remove());
+            
+            if (event.code !== 1000 && event.code !== 1001) { // Not normal closure
+                handleReconnect();
+            }
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                
+                // Validate data
+                if (!validateServerData(msg)) {
+                    console.warn("Invalid data received from server");
+                    return;
+                }
+                
+                handleServerMessage(msg);
+                
+                const ping = performance.now() - lastPingTime;
+                document.getElementById('ping').textContent = Math.round(ping);
+            } catch (e) {
+                console.error("Error parsing server message:", e);
+            }
+        };
+    } catch (e) {
+        console.error("Error creating WebSocket:", e);
+        statusEl.textContent = "Connection Failed";
         statusEl.style.color = "#ff0000";
-    };
+        handleReconnect();
+    }
+}
 
-    ws.onclose = (event) => {
-        console.log("🔴 Connection closed:", event.code, event.reason);
-        statusEl.textContent = "Disconnected";
-        statusEl.style.color = "#ff4444";
-        btnConnect.textContent = "Connect to Server";
-        
-        Object.values(players).forEach(player => player.remove());
-        Object.values(weapons).forEach(weapon => weapon.remove());
-        Object.values(powerups).forEach(powerup => powerup.remove());
-    };
-
-    ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        handleServerMessage(msg);
-        
-        const ping = performance.now() - lastPingTime;
-        document.getElementById('ping').textContent = Math.round(ping);
-    };
+function handleReconnect() {
+    if (connectionAttempts >= maxReconnectAttempts) {
+        console.log("❌ Max reconnection attempts reached");
+        addChatMessage('SYSTEM', 'Connection lost. Please refresh the page.');
+        return;
+    }
+    
+    if (isReconnecting) return;
+    
+    isReconnecting = true;
+    connectionAttempts++;
+    
+    const delay = reconnectDelay * connectionAttempts;
+    console.log(`🔄 Reconnecting in ${delay/1000}s... (Attempt ${connectionAttempts}/${maxReconnectAttempts})`);
+    addChatMessage('SYSTEM', `Reconnecting in ${delay/1000}s...`);
+    
+    setTimeout(() => {
+        isReconnecting = false;
+        connect(gameMode);
+    }, delay);
 }
 
 function handleServerMessage(msg) {
@@ -2322,10 +2453,11 @@ function setupControls() {
                     if(message.startsWith('/')) {
                         handleCommand(message);
                     } else {
-                        ws.send(JSON.stringify({
+                        const sanitized = sanitizeInput(message, 200);
+                        sendSecureMessage({
                             type: "chat",
-                            message: message
-                        }));
+                            message: sanitized
+                        });
                     }
                 }
                 chatInput.value = '';
@@ -2392,7 +2524,7 @@ function handleCommand(cmd) {
     
     switch(command) {
         case 'help':
-            addChatMessage('SYSTEM', 'Commands: /help, /stats, /ping');
+            addChatMessage('SYSTEM', 'Commands: /help, /stats, /ping, /fps');
             break;
         case 'stats':
             const acc = shotsFired > 0 ? ((shotsHit / shotsFired) * 100).toFixed(1) : 0;
@@ -2400,6 +2532,10 @@ function handleCommand(cmd) {
             break;
         case 'ping':
             addChatMessage('SYSTEM', `Ping: ${document.getElementById('ping').textContent}ms`);
+            break;
+        case 'fps':
+            const fps = Math.round(1000 / (performance.now() - lastFrame));
+            addChatMessage('SYSTEM', `FPS: ${fps}`);
             break;
         default:
             addChatMessage('SYSTEM', 'Unknown command. Type /help for commands.');
@@ -2416,16 +2552,14 @@ function shoot() {
     
     const direction = camera.getWorldDirection(new THREE.Vector3());
     
-    if(ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ 
-            type: "shoot", 
-            dir: {
-                x: direction.x,
-                y: direction.y,
-                z: direction.z
-            }
-        }));
-    }
+    sendSecureMessage({ 
+        type: "shoot", 
+        dir: {
+            x: direction.x,
+            y: direction.y,
+            z: direction.z
+        }
+    });
     
     createMuzzleFlash();
     spawnTracer(localPlayer.x, localPlayer.y + 0.6, localPlayer.z, direction);
@@ -2465,13 +2599,11 @@ function attemptPickup() {
         );
         
         if(dist < 2.0) {
-            if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: "pickup", 
-                    id: weapon.id,
-                    pickupType: "weapon"
-                }));
-            }
+            sendSecureMessage({
+                type: "pickup", 
+                id: weapon.id,
+                pickupType: "weapon"
+            });
         }
     });
     
@@ -2482,13 +2614,11 @@ function attemptPickup() {
         );
         
         if(dist < 2.0) {
-            if(ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: "pickup",
-                    id: powerup.id,
-                    pickupType: "powerup"
-                }));
-            }
+            sendSecureMessage({
+                type: "pickup",
+                id: powerup.id,
+                pickupType: "powerup"
+            });
         }
     });
 }
